@@ -1,5 +1,15 @@
 #include "MyNode.h"
 
+MyNode::MyNode()
+{
+    printf("Create %p...\n", this);
+}
+
+MyNode::~MyNode()
+{
+    printf("Destory %p...\n", this);
+}
+
 String MyNode::say_hello()
 {
     return "hello from my module";

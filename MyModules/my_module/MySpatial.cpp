@@ -1,6 +1,11 @@
 #include "MySpatial.h"
 #include <core/math/transform.h>
 
+MySpatial::MySpatial()
+{
+    // set_process(true);
+}
+
 void MySpatial::_notification(int what)
 {
     if (what == NOTIFICATION_PROCESS) {

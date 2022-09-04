@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.8)
 
 project(MyGodot)
 
+add_definitions(-DTOOLS_ENABLED=ON)
+
 if ("${CMAKE_SYSTEM_NAME}" MATCHES "Windows")
     set(MYGODOT_PLATFORM windows)
 elseif ("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
@@ -69,11 +71,17 @@ else ()
 
 endif ()
 
-
-add_custom_target(MyGodot
-    scons p="${MYGODOT_PLATFORM}" bits=64 tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j9
-    WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
-)
+if (WIN32)
+    add_custom_target(MyGodot
+        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j9
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+    )
+else()
+    add_custom_target(MyGodot
+        scons p="${MYGODOT_PLATFORM}" bits=64 tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j9
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+    )
+endif()
 
 add_subdirectory(godot/platform/android/java/nativeSrcsConfigs)
 

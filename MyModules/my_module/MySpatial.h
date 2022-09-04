@@ -6,6 +6,8 @@ class MySpatial : public Spatial {
     OBJ_CATEGORY("3D");
 
 public:
+    MySpatial();
+
     void _notification(int what);
     static void _bind_methods();
 

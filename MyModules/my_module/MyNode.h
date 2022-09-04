@@ -8,6 +8,8 @@ class MyNode : public Node {
     OBJ_CATEGORY("Nodes");
 
 public:
+    MyNode();
+    ~MyNode();
     String say_hello();
     void _notification(int what);
 
