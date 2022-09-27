@@ -2,12 +2,14 @@
 #include "MyNode.h"
 #include "MySpatial.h"
 
-void register_my_module_types()
+void initialize_my_module_module(ModuleInitializationLevel level)
 {
-    ClassDB::register_class<MyNode>();
-    ClassDB::register_class<MySpatial>();
+    if (level == ModuleInitializationLevel::MODULE_INITIALIZATION_LEVEL_SCENE) {
+        ClassDB::register_class<MyNode>();
+        ClassDB::register_class<MySpatial>();
+    }
 }
 
-void unregister_my_module_types()
+void uninitialize_my_module_module(ModuleInitializationLevel level)
 {
 }

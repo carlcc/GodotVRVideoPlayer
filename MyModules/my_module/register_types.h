@@ -1,5 +1,7 @@
 #pragma once
 
-void register_my_module_types();
-void unregister_my_module_types();
+#include <modules/register_module_types.h>
+
+void initialize_my_module_module(ModuleInitializationLevel level);
+void uninitialize_my_module_module(ModuleInitializationLevel level);
 

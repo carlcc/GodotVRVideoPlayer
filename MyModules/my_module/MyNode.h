@@ -1,11 +1,10 @@
 #pragma once
 
-#include <core/ustring.h>
+#include <core/string/ustring.h>
 #include <scene/main/node.h>
 
 class MyNode : public Node {
     GDCLASS(MyNode, Node);
-    OBJ_CATEGORY("Nodes");
 
 public:
     MyNode();

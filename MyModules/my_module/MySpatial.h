@@ -1,9 +1,8 @@
 #pragma once
-#include <scene/3d/spatial.h>
+#include <scene/3d/node_3d.h>
 
-class MySpatial : public Spatial {
-    GDCLASS(MySpatial, Spatial);
-    OBJ_CATEGORY("3D");
+class MySpatial : public Node3D {
+    GDCLASS(MySpatial, Node3D);
 
 public:
     MySpatial();
