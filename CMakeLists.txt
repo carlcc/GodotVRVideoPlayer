@@ -76,7 +76,11 @@ endif ()
 
 if (WIN32)
     add_custom_target(MyGodot
-        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j9
+        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j 14
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+    )
+    add_custom_target(CompileDB
+        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" compiledb=yes
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
 else()
@@ -95,6 +99,7 @@ file(GLOB CUSTOM_MODULE_LIST
 
 include_directories(
     godot
+    Thirdparty/ffmpeg/Win64/include
 )
 
 set(CUSTOM_MODULE_FILES)
