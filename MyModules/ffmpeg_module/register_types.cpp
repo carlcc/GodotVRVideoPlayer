@@ -12,6 +12,7 @@ void initialize_ffmpeg_module_module(ModuleInitializationLevel p_level) {
     ResourceLoader::add_resource_format_loader(resource_loader_ffmpeg, true);
 
     GDREGISTER_CLASS(VideoStreamFfmpeg);
+    GDREGISTER_CLASS(VideoStreamPlaybackFfmpeg);
 }
 
 void uninitialize_ffmpeg_module_module(ModuleInitializationLevel p_level) {

@@ -54,8 +54,10 @@ struct AvFrameDeleter {
 struct AvIoContextWrapper {
     explicit AvIoContextWrapper(const String& filePath)
     {
-        context = avio_alloc_context(
-            buffer, sizeof(buffer), 0, this,
+        enum { kBufferSize = 16384 };
+        auto* buffer = (unsigned char*)av_malloc(kBufferSize); // we don't need to free it
+        context      = avio_alloc_context(
+            buffer, kBufferSize, 0, this,
             [](void* opaque, uint8_t* buf, int buf_size) -> int {
                 return reinterpret_cast<AvIoContextWrapper*>(opaque)->read_func(buf, buf_size);
             },
@@ -66,6 +68,15 @@ struct AvIoContextWrapper {
                 return reinterpret_cast<AvIoContextWrapper*>(opaque)->seek_func(offset, whence);
             });
         file = FileAccess::open(filePath, FileAccess::READ);
+    }
+    ~AvIoContextWrapper()
+    {
+        // according to ffmpeg document:
+        // the internal buffer could have changed, and  we should free context->buffer
+        if (context != nullptr) {
+            av_free(context->buffer);
+        }
+        avio_context_free(&context);
     }
 
     int read_func(uint8_t* buf, int buf_size)
@@ -106,9 +117,8 @@ struct AvIoContextWrapper {
         return (int64_t)file->get_position();
     }
 
-    unsigned char buffer[65536];
-    AVIOContext* context;
-    Ref<FileAccess> file;
+    AVIOContext* context { nullptr };
+    Ref<FileAccess> file { nullptr };
 };
 
 class VideoStreamPlaybackFfmpeg : public VideoStreamPlayback {
@@ -159,6 +169,8 @@ class VideoStreamPlaybackFfmpeg : public VideoStreamPlayback {
     void clear();
 
 public:
+    static void _bind_methods();
+
     virtual void play() override;
     virtual void stop() override;
     virtual bool is_playing() const override;
