@@ -1,0 +1,52 @@
+[gd_scene load_steps=3 format=3 uid="uid://dsp36x464rd5d"]
+
+[ext_resource type="Script" path="res://Gui/VideoPlayer/VideoPlayer.gd" id="1_lvpho"]
+[ext_resource type="Texture2D" uid="uid://cwqjkx7l63n70" path="res://icon.svg" id="2_5n2ns"]
+
+[node name="Player" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lvpho")
+
+[node name="VideoTextureRect" type="TextureRect" parent="."]
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_5n2ns")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -31.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="PlayButton" type="Button" parent="HBoxContainer"]
+offset_right = 41.0
+offset_bottom = 31.0
+text = "Play"
+
+[node name="PlayProgressBar" type="HSlider" parent="HBoxContainer"]
+anchors_preset = -1
+offset_left = 45.0
+offset_right = 1152.0
+offset_bottom = 31.0
+grow_horizontal = 2
+grow_vertical = 0
+size_flags_horizontal = 3
+size_flags_vertical = 1
+scrollable = false
+
+[connection signal="pressed" from="HBoxContainer/PlayButton" to="." method="_on_play_button_pressed"]
+[connection signal="drag_ended" from="HBoxContainer/PlayProgressBar" to="." method="_on_play_progress_bar_drag_ended"]
+[connection signal="drag_started" from="HBoxContainer/PlayProgressBar" to="." method="_on_play_progress_bar_drag_started"]

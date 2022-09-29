@@ -1,12 +1,12 @@
-extends Node
+extends Node3D
 
-	
-var textureRect :TextureRect
+var material : StandardMaterial3D
 var mediaStream : FfmpegMediaStream
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	textureRect = find_child("VideoTextureRect", true)
+	var mesh = $MeshInstance3d as MeshInstance3D
+	material = mesh.get_active_material(0) as StandardMaterial3D
 	pass # Replace with function body.
 
 
@@ -17,11 +17,10 @@ func _process(delta):
 	pass
 
 
-func _on_set_file_pressed():
+func _on_play_pressed():
 	var ms = FfmpegMediaStream.new()
 	if not ms.init("res://Data/shjx.mp4"):
 		return
 	mediaStream = ms
 	ms.play()
-	textureRect.texture = ms.get_texture()
-	pass # Replace with function body.
+	material.albedo_texture = ms.get_texture()

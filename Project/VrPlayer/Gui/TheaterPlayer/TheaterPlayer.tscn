@@ -1,0 +1,41 @@
+[gd_scene load_steps=9 format=3 uid="uid://cdsbbyupin3ng"]
+
+[ext_resource type="Script" path="res://Gui/TheaterPlayer/TheaterPlayer.gd" id="1_8x1bd"]
+[ext_resource type="Material" uid="uid://ceh6n0mb1libx" path="res://Gui/TheaterPlayer/Player2D.material" id="1_mtliy"]
+[ext_resource type="Script" path="res://Scripts/FPSCamera.gd" id="2_nrgv2"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_l1u02"]
+
+[sub_resource type="Sky" id="Sky_4fxq0"]
+sky_material = SubResource("ProceduralSkyMaterial_l1u02")
+
+[sub_resource type="Environment" id="Environment_j1iaj"]
+background_mode = 2
+sky = SubResource("Sky_4fxq0")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dlm5f"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_tadrt"]
+material = SubResource("StandardMaterial3D_dlm5f")
+
+[node name="TheaterPlayer" type="Node3D"]
+script = ExtResource("1_8x1bd")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_j1iaj")
+
+[node name="Camera3d" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.97012)
+script = ExtResource("2_nrgv2")
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.55722, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+material_override = ExtResource("1_mtliy")
+mesh = SubResource("QuadMesh_tadrt")
+
+[node name="Button" type="Button" parent="."]
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Play"
+
+[connection signal="pressed" from="Button" to="." method="_on_play_pressed"]

@@ -7,7 +7,7 @@
 #include <core/os/semaphore.h>
 #include <memory>
 #include <mutex>
-#include <queue>
+#include <list>
 #include <scene/resources/texture.h>
 #include <servers/audio/audio_rb_resampler.h>
 
@@ -100,8 +100,9 @@ private:
 
     std::mutex decodedImagesMutex_;
     std::condition_variable hasDecodedImageCv_;
-    std::queue<FrameInfo> decodedImages_;
+    std::list<FrameInfo> decodedImages_;
     std::thread decodingThread_ {};
+    double seekTo_ { -1.0 };
 
     Ref<ImageTexture> texture_ {};
     uint32_t textureWidth_ { 0 };

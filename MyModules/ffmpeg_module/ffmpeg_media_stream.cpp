@@ -7,6 +7,11 @@ static double get_stream_time_seconds(AVStream* stream, int64_t pts)
     return pts * stream->time_base.num / (double)stream->time_base.den;
 }
 
+static int64_t get_stream_time_pts(AVStream* stream, double seconds)
+{
+    return int64_t(seconds * stream->time_base.den / (double)stream->time_base.num);
+}
+
 static double get_stream_duration(AVStream* stream)
 {
     return get_stream_time_seconds(stream, stream->duration);
@@ -41,7 +46,8 @@ bool FfmpegMediaStream::init(const String& filePath)
 
     auto ret = av_probe_input_buffer(avio->context, &inputFormat, "", nullptr, 0, 0);
     if (ret < 0) {
-        // TODO:
+        ERR_PRINT("Failed to probe input format!");
+        return false;
     } else {
         // TODO:
     }
@@ -87,6 +93,18 @@ bool FfmpegMediaStream::init(const String& filePath)
         videoStreamIndex_ = videoStreamIndices_[0];
         auto codecId      = avFormatContext_->streams[videoStreamIndex_]->codecpar->codec_id;
         auto* codec       = avcodec_find_decoder(codecId);
+
+        for (int i = 0;; i++) {
+            const AVCodecHWConfig* config = avcodec_get_hw_config(codec, i);
+            if (config != nullptr) {
+                ERR_PRINT(String("Decoder {0} does not support hardware decoding").format(codec->name));
+                break;
+            }
+            auto methodFlags = std::to_string(config->methods);
+            auto pixelFormatStr = std::to_string(int(config->pix_fmt));
+            ERR_PRINT(String("Hardware {0}, {1}, {2}").format(varray(av_hwdevice_get_type_name(config->device_type), methodFlags.c_str(), pixelFormatStr.c_str())));
+        }
+
         auto codecContext = avcodec_alloc_context3(codec);
         videoCodecContext_.reset(codecContext);
         avcodec_parameters_to_context(codecContext, formatContext->streams[videoStreamIndex_]->codecpar);
@@ -142,7 +160,9 @@ void FfmpegMediaStream::play()
     if (state_ == State::kPlaying) {
         return;
     }
-    if (state_ == State::kStopped) {
+    State prevState = state_;
+    state_          = State::kPlaying; // set state now, it will be used in decoding thread
+    if (prevState == State::kStopped) {
         assert(!decodingThread_.joinable());
         decodingThread_ = std::thread([this]() {
             decode_thread_routine();
@@ -152,12 +172,13 @@ void FfmpegMediaStream::play()
             AudioServer::get_singleton()->add_mix_callback(&FfmpegMediaStream::static_mix, this);
         }
     }
-
-    state_ = State::kPlaying;
 }
 
 void FfmpegMediaStream::stop()
 {
+    if (state_ == State::kStopped) {
+        return;
+    }
     AudioServer::get_singleton()->remove_mix_callback(&FfmpegMediaStream::static_mix, this);
 
     {
@@ -188,13 +209,14 @@ void FfmpegMediaStream::update(double delta)
     time_ += delta;
 
     Ref<Image> img { nullptr };
+    double frameTime = 0.0;
     {
         std::unique_lock<std::mutex> lck(decodedImagesMutex_);
         if (!decodedImages_.empty()) {
-            auto frameTime = decodedImages_.front().frameTime;
+            frameTime = decodedImages_.front().frameTime;
             if (time_ > frameTime) {
                 img = decodedImages_.front().image;
-                decodedImages_.pop();
+                decodedImages_.pop_front();
 
                 lck.unlock();
                 hasDecodedImageCv_.notify_one();
@@ -209,6 +231,8 @@ void FfmpegMediaStream::update(double delta)
         } else {
             texture_->update(img);
         }
+    } else if (frameTime < 0) {
+        stop();
     }
 }
 
@@ -224,7 +248,18 @@ double FfmpegMediaStream::get_position() const
 
 double FfmpegMediaStream::seek(double position)
 {
-    return 0;
+    decltype(decodedImages_) frames; // To ensure frame are not freed in critical area
+    {
+        std::unique_lock<std::mutex> lck(decodedImagesMutex_);
+        seekTo_ = position;
+        time_   = position;
+        frames  = std::move(decodedImages_);
+        audioResampler_.flush();
+    }
+    // Tell the decoding thread that we want to seek
+    hasDecodedImageCv_.notify_one();
+
+    return 0.0;
 }
 
 #define CHECK_AV_ERROR(errcode)                            \
@@ -348,15 +383,53 @@ void FfmpegMediaStream::decode_thread_routine()
     auto& videoTimeBase = formatContext->streams[videoStreamIndex_]->time_base;
 
     while (state_ != State::kStopped) {
+        // handle seek
+
+        double seekTo = -1.0;
+        {
+            std::unique_lock<std::mutex> lck(decodedImagesMutex_);
+            if (seekTo_ >= 0) {
+                seekTo  = seekTo_;
+                seekTo_ = -1.0;
+            }
+        }
+        if (seekTo >= 0) {
+            int seekFlags    = AVSEEK_FLAG_BACKWARD;
+            bool seekSucceed = false;
+            if (audioStreamIndex_ != -1) {
+                auto pts    = get_stream_time_pts(avFormatContext_->streams[audioStreamIndex_], seekTo);
+                auto ret    = av_seek_frame(avFormatContext_.get(), audioStreamIndex_, pts, seekFlags);
+                seekSucceed = ret == 0;
+            }
+            if (!seekSucceed && videoStreamIndex_ != -1) {
+                auto pts    = get_stream_time_pts(avFormatContext_->streams[videoStreamIndex_], seekTo);
+                auto ret    = av_seek_frame(avFormatContext_.get(), videoStreamIndex_, pts, seekFlags);
+                seekSucceed = ret == 0;
+            }
+            if (videoCodecContext != nullptr) {
+                avcodec_flush_buffers(videoCodecContext);
+            }
+            if (audioCodecContext != nullptr) {
+                avcodec_flush_buffers(audioCodecContext);
+            }
+            // TODO: Audios sounds strange, bug?
+
+            (void)seekSucceed;
+        }
+
         auto ret = av_read_frame(formatContext, avPacket);
         std::unique_ptr<AVPacket, AvPacketDeleter> unrefOnExitScope(avPacket); // we need to unref the packet
 
         if (ret == AVERROR_EOF) {
+            // TODO: flush decoder's internal frames
             WARN_PRINT("Video stream ended!");
+            {
+                std::unique_lock<std::mutex> lck(decodedImagesMutex_);
+                decodedImages_.push_back(FrameInfo { -1, nullptr });
+            }
             return;
         }
 
-        // TODO: Audio
         if (avPacket->stream_index == videoStreamIndex_) {
             ret = avcodec_send_packet(videoCodecContext, avPacket);
             if (ret < 0) {
@@ -373,13 +446,14 @@ void FfmpegMediaStream::decode_thread_routine()
                 return;
             }
 
-            auto img = AVFrame2Image(avFrame);
-            // TODO: The right way to calculate frame time
+            auto img       = AVFrame2Image(avFrame);
             auto frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
             {
                 std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped; });
-                decodedImages_.push(FrameInfo { frameTime, std::move(img) });
+                hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped || seekTo_ >= 0.0; });
+                if (seekTo_ < 0.0) {
+                    decodedImages_.push_back(FrameInfo { frameTime, std::move(img) });
+                }
             }
         } else if (avPacket->stream_index == audioStreamIndex_) {
             ret = avcodec_send_packet(audioCodecContext, avPacket);
