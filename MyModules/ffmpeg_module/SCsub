@@ -9,7 +9,8 @@ module_obj = []
 
 include_paths = [
     "#../Thirdparty/ffmpeg/Win64/include",
-    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/include"
+    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/include",
+    "/usr/local/include"
 ]
 libs = [
     "avcodec",
@@ -18,7 +19,8 @@ libs = [
 ]
 libpath = [
     "#../Thirdparty/ffmpeg/Win64/lib",
-    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/lib"
+    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/lib",
+    "/usr/local/lib"
 ]
 
 my_env.add_source_files(module_obj, "*.cpp")

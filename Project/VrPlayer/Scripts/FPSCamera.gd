@@ -21,13 +21,11 @@ func _input(event):
 		# Vertical mouse look.
 		rot.x = clamp(rot.x - event.relative.y * MOUSE_SENSITIVITY, -1.57, 1.57)
 		transform.basis = Basis.from_euler(rot)
-
-	if event is InputEventMouseButton:
-		var bte = event as InputEventMouseButton
-		if bte.is_pressed():
-			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-		else:
-			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	
+	if event.is_action_pressed("RightMouseDown"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	elif event.is_action_released("RightMouseDown"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _process(delta):
 	var motion = Vector3(
