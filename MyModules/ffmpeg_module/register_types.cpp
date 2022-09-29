@@ -1,5 +1,6 @@
 #include "register_types.h"
 #include "video_stream_ffmpeg.h"
+#include "ffmpeg_media_stream.h"
 
 static Ref<ResourceFormatLoaderFfmpeg> resource_loader_ffmpeg;
 
@@ -13,6 +14,7 @@ void initialize_ffmpeg_module_module(ModuleInitializationLevel p_level) {
 
     GDREGISTER_CLASS(VideoStreamFfmpeg);
     GDREGISTER_CLASS(VideoStreamPlaybackFfmpeg);
+    GDREGISTER_CLASS(FfmpegMediaStream);
 }
 
 void uninitialize_ffmpeg_module_module(ModuleInitializationLevel p_level) {

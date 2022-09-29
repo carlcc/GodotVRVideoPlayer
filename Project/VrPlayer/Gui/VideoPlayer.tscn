@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://32tljrj5kqwk"]
 
 [ext_resource type="Script" path="res://Scripts/VideoPlayer.gd" id="1_xao41"]
-[ext_resource type="Texture2D" uid="uid://cwqjkx7l63n70" path="res://icon.svg" id="2_uuog7"]
+[ext_resource type="Texture2D" uid="uid://bkyuogaxgtcjl" path="res://icon.svg" id="2_uuog7"]
 
 [node name="Player" type="Control"]
 layout_mode = 3
