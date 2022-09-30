@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://dsp36x464rd5d"]
+[gd_scene load_steps=5 format=3 uid="uid://dsp36x464rd5d"]
 
 [ext_resource type="Script" path="res://Gui/VideoPlayer/VideoPlayer.gd" id="1_lvpho"]
-[ext_resource type="Texture2D" uid="uid://cwkw46wj0o42k" path="res://icon.svg" id="2_5n2ns"]
+[ext_resource type="Texture2D" uid="uid://bkyuogaxgtcjl" path="res://icon.svg" id="2_5n2ns"]
+[ext_resource type="Material" uid="uid://cob5gcxugvgnn" path="res://Materials/Nv12_2D.material" id="2_juw2v"]
+[ext_resource type="Material" uid="uid://bymoguowpgbyx" path="res://Materials/Yuv420P_2D.material" id="3_tf5u7"]
 
 [node name="Player" type="Control"]
 layout_mode = 3
@@ -11,6 +13,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_lvpho")
+materialNv12 = ExtResource("2_juw2v")
+materialYuv420P = ExtResource("3_tf5u7")
 
 [node name="VideoTextureRect" type="TextureRect" parent="."]
 anchors_preset = -1

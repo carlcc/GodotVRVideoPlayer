@@ -74,18 +74,25 @@ else ()
 
 endif ()
 
+set(BUILD_TYPE release)
+if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
+    set(BUILD_TYPE debug)
+elseif (${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo")
+    set(BUILD_TYPE release_debug)
+endif()
+
 if (WIN32)
     add_custom_target(MyGodot
-        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j 14
+        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j 14
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
     add_custom_target(CompileDB
-        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" compiledb=yes
+        scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} compiledb=yes
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
 else()
     add_custom_target(MyGodot
-        scons p="${MYGODOT_PLATFORM}" bits=64 tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j9
+        scons p="${MYGODOT_PLATFORM}" bits=64 tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j9
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
 endif()
@@ -100,6 +107,7 @@ file(GLOB CUSTOM_MODULE_LIST
 include_directories(
     godot
     Thirdparty/ffmpeg/Win64/include
+    MyModules/ffmpeg_module/libyuv/include
 )
 
 set(CUSTOM_MODULE_FILES)

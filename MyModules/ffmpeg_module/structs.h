@@ -43,6 +43,13 @@ struct AvFrameDeleter {
     }
 };
 
+struct AvBufferRefDeleter {
+    void operator()(AVBufferRef* r)
+    {
+        av_buffer_unref(&r);
+    }
+};
+
 struct AvIoContextWrapper {
     explicit AvIoContextWrapper(const String& filePath)
     {

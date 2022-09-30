@@ -5,9 +5,9 @@
 #include <condition_variable>
 #include <core/object/ref_counted.h>
 #include <core/os/semaphore.h>
+#include <list>
 #include <memory>
 #include <mutex>
-#include <list>
 #include <scene/resources/texture.h>
 #include <servers/audio/audio_rb_resampler.h>
 
@@ -20,13 +20,21 @@ class FfmpegMediaStream : public RefCounted {
         kPaused,
     };
 
-    struct FrameInfo {
-        double frameTime;
-        Ref<Image> image;
-    };
     static void static_mix(void* data);
 
 public:
+    enum PixelFormat : int {
+        kPixelFormatNone = -1,
+        kPixelFormatYuv420P,
+        kPixelFormatNv12,
+    };
+
+    struct FrameInfo {
+        PixelFormat format { PixelFormat::kPixelFormatNone };
+        double frameTime { 0.0 };
+        Ref<Image> images[4] { nullptr };
+    };
+
     static void _bind_methods();
 
     FfmpegMediaStream();
@@ -38,7 +46,11 @@ public:
     // FfmpegMediaStream& operator=(const FfmpegMediaStream&) = delete;
     FfmpegMediaStream& operator=(FfmpegMediaStream&&) = delete;
 
-    bool init(const String& filePath);
+    bool set_file(const String& filePath);
+
+    Vector<String> available_video_hardware_accelerators();
+
+    bool create_decoders(const String& videoHwAccel = "none");
 
     void play();
 
@@ -58,7 +70,8 @@ public:
     bool is_playing() const { return state_ == State::kPlaying; }
     bool is_paused() const { return state_ == State::kPaused; }
 
-    Ref<Texture2D> get_texture() const { return texture_; }
+    Ref<ImageTexture> get_texture(uint32_t index) const { return textures_[index]; }
+    uint32_t get_textures_count() const { return textures_.size(); }
 
 private:
     bool mix(AudioFrame* p_buffer, int p_frames);
@@ -66,6 +79,10 @@ private:
     void _mix_audio();
 
     void decode_thread_routine();
+
+    int hw_decoder_init(AVCodecContext* ctx, const enum AVHWDeviceType type);
+
+    bool try_apply_hw_accelerator(AVCodecContext* codecContext, const AVCodec* codec, const String& hw);
 
 private:
     String filePath_ {};
@@ -77,12 +94,14 @@ private:
     std::unique_ptr<AVCodecContext, AvCodecContextDeleter> audioCodecContext_;
     std::unique_ptr<AVPacket, AvPacketDeleter> avPacket_;
     std::unique_ptr<AVFrame, AvFrameDeleter> avFrame_ { nullptr };
+    std::unique_ptr<AVBufferRef, AvBufferRefDeleter> hwBuffer_ { nullptr };
+    const AVInputFormat* inputFormat_ { nullptr };
 
     Vector<int> videoStreamIndices_ {};
     Vector<int> audioStreamIndices_ {};
     Vector<int> subtitleStreamIndices_ {};
-    int videoStreamIndex_ { -1 };
-    int audioStreamIndex_ { -1 };
+    int videoStreamIndex_ { AVERROR_DECODER_NOT_FOUND };
+    int audioStreamIndex_ { AVERROR_DECODER_NOT_FOUND };
 
     Vector<AudioFrame> mixBuffer_ {};
     AudioRBResampler audioResampler_ {};
@@ -104,7 +123,11 @@ private:
     std::thread decodingThread_ {};
     double seekTo_ { -1.0 };
 
-    Ref<ImageTexture> texture_ {};
+    Vector<Ref<ImageTexture>> textures_ {};
+    PixelFormat currentPixelFormat_ { PixelFormat::kPixelFormatNone };
+
     uint32_t textureWidth_ { 0 };
     uint32_t textureHeight_ { 0 };
 };
+
+VARIANT_ENUM_CAST(FfmpegMediaStream::PixelFormat);

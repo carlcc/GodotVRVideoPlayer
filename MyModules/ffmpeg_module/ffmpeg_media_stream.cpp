@@ -1,6 +1,6 @@
 #include "ffmpeg_media_stream.h"
 #include <scene/audio/audio_stream_player.h>
-#include <thirdparty/misc/yuv2rgb.h>
+#include <string>
 
 static double get_stream_time_seconds(AVStream* stream, int64_t pts)
 {
@@ -17,9 +17,26 @@ static double get_stream_duration(AVStream* stream)
     return get_stream_time_seconds(stream, stream->duration);
 }
 
+inline uint32_t get_textures_count_by_pixel_format(FfmpegMediaStream::PixelFormat fmt)
+{
+    // clang-format off
+    switch (fmt) {
+    case FfmpegMediaStream::kPixelFormatYuv420P: return 3;
+    case FfmpegMediaStream::kPixelFormatNv12:    return 2;
+    case FfmpegMediaStream::kPixelFormatNone:
+    default:
+        ERR_PRINT("Invalid format");
+        abort();
+    }
+    // clang-format on
+}
+
+static const String kPixelFormatChangedSignalName { "pixel_format_changed" };
+
 void FfmpegMediaStream::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("get_texture"), &FfmpegMediaStream::get_texture);
+    ClassDB::bind_method(D_METHOD("get_texture", "index"), &FfmpegMediaStream::get_texture);
+    ClassDB::bind_method(D_METHOD("get_textures_count"), &FfmpegMediaStream::get_textures_count);
     ClassDB::bind_method(D_METHOD("update", "delta"), &FfmpegMediaStream::update);
     ClassDB::bind_method(D_METHOD("play"), &FfmpegMediaStream::play);
     ClassDB::bind_method(D_METHOD("stop"), &FfmpegMediaStream::stop);
@@ -27,36 +44,42 @@ void FfmpegMediaStream::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_length"), &FfmpegMediaStream::get_length);
     ClassDB::bind_method(D_METHOD("get_position"), &FfmpegMediaStream::get_position);
     ClassDB::bind_method(D_METHOD("seek", "position"), &FfmpegMediaStream::seek);
-    ClassDB::bind_method(D_METHOD("init", "filePath"), &FfmpegMediaStream::init);
+    ClassDB::bind_method(D_METHOD("set_file", "filePath"), &FfmpegMediaStream::set_file);
+    ClassDB::bind_method(D_METHOD("available_video_hardware_accelerators"), &FfmpegMediaStream::available_video_hardware_accelerators);
+    ClassDB::bind_method(D_METHOD("create_decoders", "hw"), &FfmpegMediaStream::create_decoders);
+
+    ADD_SIGNAL(MethodInfo(kPixelFormatChangedSignalName, PropertyInfo(Variant::INT, "format")));
+    BIND_ENUM_CONSTANT(kPixelFormatNone);
+    BIND_ENUM_CONSTANT(kPixelFormatYuv420P);
+    BIND_ENUM_CONSTANT(kPixelFormatNv12);
 }
 
-bool FfmpegMediaStream::init(const String& filePath)
+bool FfmpegMediaStream::set_file(const String& filePath)
 {
+    if (!filePath_.is_empty()) {
+        ERR_PRINT("You have set the file path before, try to create a new FfmpegMediaStream object!");
+        return false;
+    }
     avioContext_ = std::make_unique<AvIoContextWrapper>(filePath);
     auto* avio   = avioContext_.get();
-
     if (avio->file.is_null()) {
         ERR_PRINT("Cannot open file '" + filePath + "'.");
         return false;
     }
-
     filePath_ = filePath;
-    //
-    const AVInputFormat* inputFormat = nullptr;
 
-    auto ret = av_probe_input_buffer(avio->context, &inputFormat, "", nullptr, 0, 0);
+    auto ret = av_probe_input_buffer(avio->context, &inputFormat_, "", nullptr, 0, 0);
     if (ret < 0) {
         ERR_PRINT("Failed to probe input format!");
         return false;
-    } else {
-        // TODO:
     }
 
+    // open file
     AVFormatContext* formatContext = avformat_alloc_context();
-    formatContext->pb              = avio->context;
+    formatContext->pb              = avioContext_->context;
     formatContext->flags           = AVFMT_FLAG_CUSTOM_IO;
     avFormatContext_.reset(formatContext);
-    ret = avformat_open_input(&formatContext, "", inputFormat, nullptr);
+    ret = avformat_open_input(&formatContext, "", inputFormat_, nullptr);
     if (ret != 0) {
         char buf[AV_ERROR_MAX_STRING_SIZE];
         av_make_error_string(buf, AV_ERROR_MAX_STRING_SIZE, ret);
@@ -65,10 +88,6 @@ bool FfmpegMediaStream::init(const String& filePath)
         return false;
     }
 
-    if (avformat_find_stream_info(formatContext, nullptr) < 0) {
-        ERR_PRINT("Failed to find stream info");
-        return false;
-    }
     for (int i = 0; i < formatContext->nb_streams; ++i) {
         auto* stream = formatContext->streams[i];
         if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -79,48 +98,104 @@ bool FfmpegMediaStream::init(const String& filePath)
             subtitleStreamIndices_.push_back(i);
         }
     }
+    if (!videoStreamIndices_.is_empty()) { // TODO: Multiple stream?
+        const AVCodec* codec = nullptr;
+        videoStreamIndex_    = av_find_best_stream(formatContext, AVMEDIA_TYPE_VIDEO, -1, -1, &codec, 0);
+        assert(videoStreamIndex_ >= 0);
+    }
+    if (!audioStreamIndices_.is_empty()) {
+        const AVCodec* codec = nullptr;
+        audioStreamIndex_    = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, &codec, 0);
+        assert(audioStreamIndex_ >= 0);
+    }
+
+    if (avformat_find_stream_info(formatContext, nullptr) < 0) {
+        ERR_PRINT("Failed to find stream info");
+        return false;
+    }
 
     if (videoStreamIndices_.is_empty() && audioStreamIndices_.is_empty()) {
         ERR_PRINT("Failed to find a video stream and audio stream.");
         return false;
     }
-
-    // decoder
     avPacket_.reset(av_packet_alloc());
     avFrame_.reset(av_frame_alloc());
 
-    if (!videoStreamIndices_.is_empty()) { // TODO: Multiple stream?
-        videoStreamIndex_ = videoStreamIndices_[0];
-        auto codecId      = avFormatContext_->streams[videoStreamIndex_]->codecpar->codec_id;
-        auto* codec       = avcodec_find_decoder(codecId);
+    return true;
+}
+
+static String get_hw_type_name(const AVCodecHWConfig* cfg)
+{
+    auto* deviceTypeName = av_hwdevice_get_type_name(cfg->device_type);
+    if (deviceTypeName == nullptr) {
+        deviceTypeName = "[null]";
+    }
+    String result = deviceTypeName;
+    result        = result.to_lower();
+    return result;
+}
+
+Vector<String> FfmpegMediaStream::available_video_hardware_accelerators()
+{
+    Vector<String> result;
+
+    if (!videoStreamIndices_.is_empty()) {
+        auto codecId = avFormatContext_->streams[videoStreamIndex_]->codecpar->codec_id;
+        auto* codec  = avcodec_find_decoder(codecId);
+        assert(codec != nullptr);
 
         for (int i = 0;; i++) {
             const AVCodecHWConfig* config = avcodec_get_hw_config(codec, i);
-            if (config != nullptr) {
-                ERR_PRINT(String("Decoder {0} does not support hardware decoding").format(codec->name));
+            if (config == nullptr) {
                 break;
             }
-            auto methodFlags = std::to_string(config->methods);
-            auto pixelFormatStr = std::to_string(int(config->pix_fmt));
-            ERR_PRINT(String("Hardware {0}, {1}, {2}").format(varray(av_hwdevice_get_type_name(config->device_type), methodFlags.c_str(), pixelFormatStr.c_str())));
+            auto deviceTypeName = get_hw_type_name(config);
+            result.push_back(deviceTypeName);
         }
+    }
+
+    return result;
+}
+
+bool FfmpegMediaStream::create_decoders(const String& videoHwAccel)
+{
+    if (videoStreamIndex_ >= 0) {
+        auto* stream = avFormatContext_->streams[videoStreamIndex_];
+        auto codecId = stream->codecpar->codec_id;
+        auto* codec  = avcodec_find_decoder(codecId);
 
         auto codecContext = avcodec_alloc_context3(codec);
         videoCodecContext_.reset(codecContext);
-        avcodec_parameters_to_context(codecContext, formatContext->streams[videoStreamIndex_]->codecpar);
-        codecContext->thread_count = 8;
+        avcodec_parameters_to_context(codecContext, stream->codecpar);
+
+        bool isHwAccelerated = false;
+        auto hwLower         = videoHwAccel.to_lower();
+        if (!hwLower.is_empty() && hwLower != "none") {
+            isHwAccelerated = try_apply_hw_accelerator(codecContext, codec, hwLower);
+            if (isHwAccelerated) {
+                codecContext->thread_count = (int)std::thread::hardware_concurrency();
+            }
+        }
+
+        if (isHwAccelerated) {
+            ERR_PRINT(String("Using hw decoder {0}").format(varray(hwLower)));
+        } else {
+            ERR_PRINT(String("No hw decoder for {0} with name {1} found").format(varray(codec->name, hwLower)));
+        }
+
         if (0 != avcodec_open2(codecContext, codec, nullptr)) {
             ERR_PRINT(String("Open codec {0} failed").format(avcodec_get_name(codecId)));
             return false;
         }
     }
-    if (!audioStreamIndices_.is_empty()) {
-        audioStreamIndex_ = audioStreamIndices_[0];
-        auto codecId      = avFormatContext_->streams[audioStreamIndex_]->codecpar->codec_id;
-        auto* codec       = avcodec_find_decoder(codecId);
+    if (audioStreamIndex_ > 0) {
+        auto* stream = avFormatContext_->streams[audioStreamIndex_];
+        auto codecId = stream->codecpar->codec_id;
+        auto* codec  = avcodec_find_decoder(codecId);
+
         auto codecContext = avcodec_alloc_context3(codec);
         audioCodecContext_.reset(codecContext);
-        avcodec_parameters_to_context(codecContext, formatContext->streams[audioStreamIndex_]->codecpar);
+        avcodec_parameters_to_context(codecContext, stream->codecpar);
         if (0 != avcodec_open2(codecContext, codec, nullptr)) {
             ERR_PRINT(String("Open codec {0} failed").format(avcodec_get_name(codecId)));
             return false;
@@ -132,14 +207,10 @@ bool FfmpegMediaStream::init(const String& filePath)
     } else {
         audioResampler_.clear();
     }
-
     return true;
 }
 
-FfmpegMediaStream::FfmpegMediaStream()
-{
-    texture_ = Ref<ImageTexture>(memnew(ImageTexture));
-}
+FfmpegMediaStream::FfmpegMediaStream() = default;
 
 FfmpegMediaStream::~FfmpegMediaStream()
 {
@@ -208,14 +279,13 @@ void FfmpegMediaStream::update(double delta)
     }
     time_ += delta;
 
-    Ref<Image> img { nullptr };
-    double frameTime = 0.0;
+    FrameInfo frameInfo {};
     {
         std::unique_lock<std::mutex> lck(decodedImagesMutex_);
         if (!decodedImages_.empty()) {
-            frameTime = decodedImages_.front().frameTime;
+            auto frameTime = decodedImages_.front().frameTime;
             if (time_ > frameTime) {
-                img = decodedImages_.front().image;
+                frameInfo = decodedImages_.front();
                 decodedImages_.pop_front();
 
                 lck.unlock();
@@ -223,15 +293,37 @@ void FfmpegMediaStream::update(double delta)
             }
         }
     }
-    if (img != nullptr) {
-        if (textureWidth_ != img->get_width() || textureHeight_ != img->get_height()) {
-            texture_->set_image(img);
-            textureWidth_  = img->get_width();
-            textureHeight_ = img->get_height();
-        } else {
-            texture_->update(img);
+    if (frameInfo.format != PixelFormat::kPixelFormatNone) {
+        auto textureCount = get_textures_count_by_pixel_format(frameInfo.format);
+
+        if (frameInfo.format != currentPixelFormat_) {
+            currentPixelFormat_ = frameInfo.format;
+            textures_.clear();
+            textures_.resize((int)textureCount);
+            for (auto& t : textures_) {
+                t = Ref<ImageTexture>(memnew(ImageTexture));
+            }
+            // force recreate texture
+            textureWidth_  = 0;
+            textureHeight_ = 0;
+
+            emit_signal(kPixelFormatChangedSignalName, frameInfo.format);
         }
-    } else if (frameTime < 0) {
+
+        auto& img0 = frameInfo.images[0];
+        auto* tw   = textures_.ptrw();
+        if (textureWidth_ != img0->get_width() || textureHeight_ != img0->get_height()) {
+            textureWidth_  = img0->get_width();
+            textureHeight_ = img0->get_height();
+            for (uint32_t i = 0; i < textureCount; ++i) {
+                tw[i]->set_image(frameInfo.images[i]);
+            }
+        } else {
+            for (uint32_t i = 0; i < textureCount; ++i) {
+                tw[i]->update(frameInfo.images[i]);
+            }
+        }
+    } else if (frameInfo.frameTime < 0) {
         stop();
     }
 }
@@ -262,43 +354,118 @@ double FfmpegMediaStream::seek(double position)
     return 0.0;
 }
 
-#define CHECK_AV_ERROR(errcode)                            \
-    do {                                                   \
-        if (errcode == 0)                                  \
-            break;                                         \
-        char errBuf[512];                                  \
-        av_strerror(ret, errBuf, sizeof(errBuf));          \
-        ERR_PRINT(String("av error: {0}").format(errBuf)); \
+#define CHECK_AV_ERROR(errcode)                                    \
+    do {                                                           \
+        if (errcode == 0)                                          \
+            break;                                                 \
+        char errBuf[512];                                          \
+        av_strerror(ret, errBuf, sizeof(errBuf));                  \
+        ERR_PRINT(String("av error: {0}").format(varray(errBuf))); \
     } while (false)
 
-static Ref<Image> AVFrame2Image(AVFrame* frame)
+static int64_t now()
+{
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+template <int kElementSize>
+inline void copy_video_frame(
+    int width, int height,
+    uint8_t* dst,
+    uint8_t* src, int srcStride)
+{
+    auto dstStride = width * kElementSize;
+    assert(dstStride <= srcStride);
+    if (width == srcStride) {
+        memcpy(dst, src, dstStride * height);
+    } else {
+        for (int i = 0; i < height; ++i) {
+            memcpy(dst, src, dstStride);
+            dst += dstStride;
+            src += srcStride;
+        }
+    }
+}
+
+static void FillYuv420P(FfmpegMediaStream::FrameInfo& frameInfo, AVFrame* frame)
+{
+    auto width      = frame->width;
+    auto height     = frame->height;
+    auto halfWidth  = frame->width / 2;
+    auto halfHeight = frame->height / 2;
+    auto ySize      = width * height;
+    auto uvSize     = halfWidth * halfHeight;
+
+    Vector<uint8_t> yBuffer, uBuffer, vBuffer;
+    yBuffer.resize(ySize);
+    uBuffer.resize(uvSize);
+    vBuffer.resize(uvSize);
+    auto* yw = yBuffer.ptrw();
+    auto* uw = uBuffer.ptrw();
+    auto* vw = vBuffer.ptrw();
+
+    copy_video_frame<1>(width, height, yw, frame->data[0], frame->linesize[0]);
+    copy_video_frame<1>(halfWidth, halfHeight, uw, frame->data[1], frame->linesize[1]);
+    copy_video_frame<1>(halfWidth, halfHeight, vw, frame->data[2], frame->linesize[2]);
+
+    frameInfo.images[0] = Ref<Image> { memnew(Image(width, height, false, Image::FORMAT_R8, yBuffer)) };
+    frameInfo.images[1] = Ref<Image> { memnew(Image(halfWidth, halfHeight, false, Image::FORMAT_R8, uBuffer)) };
+    frameInfo.images[2] = Ref<Image> { memnew(Image(halfWidth, halfHeight, false, Image::FORMAT_R8, vBuffer)) };
+}
+
+static void FillNv12(FfmpegMediaStream::FrameInfo& frameInfo, AVFrame* frame)
+{
+    auto width      = frame->width;
+    auto height     = frame->height;
+    auto halfWidth  = frame->width / 2;
+    auto halfHeight = frame->height / 2;
+    auto ySize      = width * height;
+    auto uvSize     = halfWidth * halfHeight * 2;
+
+    Vector<uint8_t> yBuffer, uvBuffer;
+    yBuffer.resize(ySize);
+    uvBuffer.resize(uvSize);
+    auto* yw  = yBuffer.ptrw();
+    auto* uvw = uvBuffer.ptrw();
+
+    copy_video_frame<1>(width, height, yw, frame->data[0], frame->linesize[0]);
+    copy_video_frame<2>(halfWidth, halfHeight, uvw, frame->data[1], frame->linesize[1]);
+
+    frameInfo.images[0] = Ref<Image> { memnew(Image(width, height, false, Image::FORMAT_R8, yBuffer)) };
+    frameInfo.images[1] = Ref<Image> { memnew(Image(halfWidth, halfHeight, false, Image::FORMAT_RG8, uvBuffer)) };
+}
+
+static FfmpegMediaStream::FrameInfo AVFrame2Image(AVFrame* frame, AVFrame* tmpFrame)
 {
     // TODO: other format
-    int pitch = 4;
-    Vector<uint8_t> rgbBuffer;
-    rgbBuffer.resize(frame->width * frame->height * pitch);
+
+    FfmpegMediaStream::FrameInfo frameInfo {};
+
+    // TODO: handle odd frame size?
+    assert(frame->width % 2 == 0);
+    assert(frame->height % 2 == 0);
 
     {
-        auto* dst = rgbBuffer.ptrw();
+        // TODO: convert with gpu or render these formats directly using material and shader
         if (frame->format == AV_PIX_FMT_YUV420P) {
-            yuv420_2_rgb8888(dst,
-                frame->data[0],              // y
-                frame->data[1],              // u
-                frame->data[2],              // v
-                frame->width, frame->height, // w, h
-                frame->linesize[0],          // y stride
-                frame->linesize[1],          // uv stride
-                frame->width * 4             // dst stride
-            );
+            frameInfo.format = FfmpegMediaStream::kPixelFormatYuv420P;
+            FillYuv420P(frameInfo, frame);
+        } else if (frame->format == AV_PIX_FMT_DXVA2_VLD) {
+            auto ret = av_hwframe_transfer_data(tmpFrame, frame, 0);
+            if (ret < 0) {
+                ERR_PRINT("Failed to transfer hw frame");
+                return frameInfo;
+            }
 
+            frameInfo.format = FfmpegMediaStream::kPixelFormatNv12;
+            FillNv12(frameInfo, tmpFrame);
         } else {
             abort(); // TODO:
         }
     }
 
-    // zero copy image creation
-    Ref<Image> img = memnew(Image(frame->width, frame->height, 0, Image::FORMAT_RGBA8, rgbBuffer));
-    return img;
+    return frameInfo;
 }
 
 bool FfmpegMediaStream::mix(AudioFrame* p_buffer, int p_frames)
@@ -379,12 +546,17 @@ void FfmpegMediaStream::decode_thread_routine()
     auto* audioCodecContext = audioCodecContext_.get();
     auto* avPacket          = avPacket_.get();
     auto* avFrame           = avFrame_.get();
+    auto* tmpFrame          = av_frame_alloc(); // TODO: Only alloc when decoder is hw decoder
+    tmpFrame->format        = AV_PIX_FMT_NV12;
+    std::unique_ptr<AVFrame, AvFrameDeleter> tmpFrame_(tmpFrame);
 
     auto& videoTimeBase = formatContext->streams[videoStreamIndex_]->time_base;
 
+    int currentWidth  = -1;
+    int currentHeight = -1;
+
     while (state_ != State::kStopped) {
         // handle seek
-
         double seekTo = -1.0;
         {
             std::unique_lock<std::mutex> lck(decodedImagesMutex_);
@@ -396,12 +568,12 @@ void FfmpegMediaStream::decode_thread_routine()
         if (seekTo >= 0) {
             int seekFlags    = AVSEEK_FLAG_BACKWARD;
             bool seekSucceed = false;
-            if (audioStreamIndex_ != -1) {
+            if (audioStreamIndex_ != AVERROR_DECODER_NOT_FOUND) {
                 auto pts    = get_stream_time_pts(avFormatContext_->streams[audioStreamIndex_], seekTo);
                 auto ret    = av_seek_frame(avFormatContext_.get(), audioStreamIndex_, pts, seekFlags);
                 seekSucceed = ret == 0;
             }
-            if (!seekSucceed && videoStreamIndex_ != -1) {
+            if (!seekSucceed && videoStreamIndex_ != AVERROR_DECODER_NOT_FOUND) {
                 auto pts    = get_stream_time_pts(avFormatContext_->streams[videoStreamIndex_], seekTo);
                 auto ret    = av_seek_frame(avFormatContext_.get(), videoStreamIndex_, pts, seekFlags);
                 seekSucceed = ret == 0;
@@ -425,7 +597,7 @@ void FfmpegMediaStream::decode_thread_routine()
             WARN_PRINT("Video stream ended!");
             {
                 std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                decodedImages_.push_back(FrameInfo { -1, nullptr });
+                decodedImages_.push_back(FrameInfo { PixelFormat::kPixelFormatNone, -1, nullptr });
             }
             return;
         }
@@ -445,14 +617,18 @@ void FfmpegMediaStream::decode_thread_routine()
                 abort();
                 return;
             }
-
-            auto img       = AVFrame2Image(avFrame);
-            auto frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
+            auto frameInfo = AVFrame2Image(avFrame, tmpFrame);
+            if (frameInfo.format == PixelFormat::kPixelFormatNone) {
+                // Convert failed
+                ERR_PRINT("Failed to convert frame, discard");
+                continue;
+            }
+            frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
             {
                 std::unique_lock<std::mutex> lck(decodedImagesMutex_);
                 hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped || seekTo_ >= 0.0; });
                 if (seekTo_ < 0.0) {
-                    decodedImages_.push_back(FrameInfo { frameTime, std::move(img) });
+                    decodedImages_.push_back(std::move(frameInfo));
                 }
             }
         } else if (avPacket->stream_index == audioStreamIndex_) {
@@ -491,4 +667,36 @@ void FfmpegMediaStream::decode_thread_routine()
             }
         }
     }
+}
+
+int FfmpegMediaStream::hw_decoder_init(AVCodecContext* ctx, const enum AVHWDeviceType type)
+{
+    AVBufferRef* hwDeviceCtx { nullptr };
+    int err = av_hwdevice_ctx_create(&hwDeviceCtx, type, nullptr, nullptr, 0);
+    if (err < 0) {
+        ERR_PRINT("Failed to create specified HW device.");
+        return err;
+    }
+    ctx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
+    hwBuffer_.reset(hwDeviceCtx);
+
+    return err;
+}
+
+bool FfmpegMediaStream::try_apply_hw_accelerator(AVCodecContext* codecContext, const AVCodec* codec, const String& hw)
+{
+    for (int i = 0;; i++) {
+        const AVCodecHWConfig* config = avcodec_get_hw_config(codec, i);
+        if (config == nullptr) {
+            break;
+        }
+        auto deviceTypeName = get_hw_type_name(config);
+        if (deviceTypeName != hw) {
+            continue;
+        }
+        if (hw_decoder_init(codecContext, config->device_type) == 0) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -10,7 +10,7 @@ module_obj = []
 include_paths = [
     "#../Thirdparty/ffmpeg/Win64/include",
     "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/include",
-    "/usr/local/include"
+    "/usr/local/include",
 ]
 libs = [
     "avcodec",
@@ -28,7 +28,6 @@ env.modules_sources += module_obj
 
 my_env.Prepend(CPPPATH=include_paths, LIBS=libs, LIBPATH=libpath)
 env.Prepend(LIBS=libs, LIBPATH=libpath)
-
 
 # Needed to force rebuilding the module files when the thirdparty library is updated.
 # env.Depends(module_obj, thirdparty_obj)
