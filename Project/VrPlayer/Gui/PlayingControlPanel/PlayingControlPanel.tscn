@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://dqtf8b5arjboe"]
+[gd_scene load_steps=10 format=3 uid="uid://dqtf8b5arjboe"]
 
 [ext_resource type="Script" path="res://Gui/PlayingControlPanel/PlayingControlPanel.gd" id="1_b1fen"]
 [ext_resource type="Shader" path="res://Shaders/Nv12_2D.gdshader" id="2_ddkon"]
@@ -6,6 +6,7 @@
 [ext_resource type="Material" uid="uid://cdydrp8nrmvq0" path="res://Materials/Nv12_3D.material" id="4_ai5iv"]
 [ext_resource type="Material" uid="uid://ca0geguemw1pv" path="res://Materials/Yuv420P_3D.material" id="5_1ojvk"]
 [ext_resource type="Material" uid="uid://dyuuk6js3gdm4" path="res://Materials/Nv12_Panorama.material" id="6_u8nuf"]
+[ext_resource type="Material" uid="uid://ca0geguemw1pv" path="res://Materials/Yuv420P_Panorama.material" id="7_n1f4t"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_frnl1"]
 shader = ExtResource("2_ddkon")
@@ -26,6 +27,7 @@ materialYuv420P = SubResource("ShaderMaterial_ymhpt")
 materialNv12_3D = ExtResource("4_ai5iv")
 materialYuv420P_3D = ExtResource("5_1ojvk")
 materialNv12_Panorama = ExtResource("6_u8nuf")
+materialYuv420P_Panorama = ExtResource("7_n1f4t")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 1
