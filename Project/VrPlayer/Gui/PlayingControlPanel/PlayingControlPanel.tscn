@@ -1,24 +1,17 @@
-[gd_scene load_steps=10 format=3 uid="uid://dqtf8b5arjboe"]
+[gd_scene load_steps=9 format=3 uid="uid://dqtf8b5arjboe"]
 
 [ext_resource type="Script" path="res://Gui/PlayingControlPanel/PlayingControlPanel.gd" id="1_b1fen"]
 [ext_resource type="Shader" path="res://Shaders/Nv12_2D.gdshader" id="2_ddkon"]
 [ext_resource type="Shader" path="res://Shaders/Yuv420P_2D.gdshader" id="3_bs1sb"]
-[ext_resource type="Shader" path="res://Shaders/Nv12_3D.gdshader" id="4_uigrg"]
-[ext_resource type="Shader" path="res://Shaders/Yuv420P_3D.gdshader" id="5_2d0hl"]
+[ext_resource type="Material" uid="uid://cdydrp8nrmvq0" path="res://Materials/Nv12_3D.material" id="4_ai5iv"]
+[ext_resource type="Material" uid="uid://ca0geguemw1pv" path="res://Materials/Yuv420P_3D.material" id="5_1ojvk"]
+[ext_resource type="Material" uid="uid://dyuuk6js3gdm4" path="res://Materials/Nv12_Panorama.material" id="6_u8nuf"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_frnl1"]
 shader = ExtResource("2_ddkon")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ymhpt"]
 shader = ExtResource("3_bs1sb")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_qdrnt"]
-render_priority = 0
-shader = ExtResource("4_uigrg")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ktf53"]
-render_priority = 0
-shader = ExtResource("5_2d0hl")
 
 [node name="PlayingControlPanel" type="Control"]
 layout_mode = 3
@@ -30,10 +23,12 @@ grow_vertical = 2
 script = ExtResource("1_b1fen")
 materialNv12 = SubResource("ShaderMaterial_frnl1")
 materialYuv420P = SubResource("ShaderMaterial_ymhpt")
-materialNv12_3D = SubResource("ShaderMaterial_qdrnt")
-materialYuv420P_3D = SubResource("ShaderMaterial_ktf53")
+materialNv12_3D = ExtResource("4_ai5iv")
+materialYuv420P_3D = ExtResource("5_1ojvk")
+materialNv12_Panorama = ExtResource("6_u8nuf")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
@@ -43,11 +38,13 @@ grow_horizontal = 2
 grow_vertical = 0
 
 [node name="PlayButton" type="Button" parent="HBoxContainer"]
+layout_mode = 2
 offset_right = 41.0
 offset_bottom = 31.0
 text = "Play"
 
 [node name="PlayProgressBar" type="HSlider" parent="HBoxContainer"]
+layout_mode = 2
 anchors_preset = -1
 offset_left = 45.0
 offset_right = 1152.0

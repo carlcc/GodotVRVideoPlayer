@@ -1,0 +1,64 @@
+[gd_scene load_steps=4 format=3 uid="uid://bhhrloul6ltxq"]
+
+[ext_resource type="Script" path="res://Scenes/VrPlayer/VrPlayer.gd" id="1_2h68r"]
+[ext_resource type="PackedScene" uid="uid://da1qltq2v4rur" path="res://Scenes/PanoramaPlayer/PanoramaPlayer.tscn" id="1_lapqs"]
+[ext_resource type="Script" path="res://Scripts/FPSCamera.gd" id="2_kj8be"]
+
+[node name="VrPlayer" type="Node3D"]
+script = ExtResource("1_2h68r")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LFrame" type="Control" parent="Control"]
+layout_mode = 3
+anchor_right = 0.5
+anchor_bottom = 1.0
+
+[node name="LEyeTexture" type="TextureRect" parent="Control/LFrame"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="RFrame" type="Control" parent="Control"]
+layout_mode = 3
+anchor_left = 0.5
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="REyeTexture" type="TextureRect" parent="Control/RFrame"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="PanoramaPlayer" parent="." instance=ExtResource("1_lapqs")]
+
+[node name="LEye" type="SubViewport" parent="."]
+size = Vector2i(1024, 1024)
+render_target_update_mode = 4
+
+[node name="LCamera" type="Camera3D" parent="LEye"]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
+script = ExtResource("2_kj8be")
+canMove = false
+
+[node name="REye" type="SubViewport" parent="."]
+size = Vector2i(1024, 1024)
+render_target_update_mode = 4
+
+[node name="RCamera" type="Camera3D" parent="REye"]
+script = ExtResource("2_kj8be")
+canMove = false

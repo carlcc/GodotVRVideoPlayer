@@ -1,5 +1,7 @@
 extends Camera3D
 
+@export var canMove : bool = true
+
 const MOUSE_SENSITIVITY = 0.002
 const MOVE_SPEED = 1.5
 
@@ -10,6 +12,7 @@ var isMouseDown : bool = false
 
 
 func _ready():
+	rot = transform.basis.get_euler()
 	# Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	pass
 
@@ -29,17 +32,18 @@ func _input(event):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _process(delta):
-	var motion = Vector3(
-			Input.get_action_strength("MoveRight") - Input.get_action_strength("MoveLeft"),
-			0,
-			Input.get_action_strength("MoveBack") - Input.get_action_strength("MoveForward")
-	)
+	if canMove:
+		var motion = Vector3(
+				Input.get_action_strength("MoveRight") - Input.get_action_strength("MoveLeft"),
+				0,
+				Input.get_action_strength("MoveBack") - Input.get_action_strength("MoveForward")
+		)
 
-	motion.y += Input.get_action_strength("MoveUp") - Input.get_action_strength("MoveDown")
-	# Normalize motion to prevent diagonal movement from being
-	# `sqrt(2)` times faster than straight movement.
-	motion = motion.normalized()
+		motion.y += Input.get_action_strength("MoveUp") - Input.get_action_strength("MoveDown")
+		# Normalize motion to prevent diagonal movement from being
+		# `sqrt(2)` times faster than straight movement.
+		motion = motion.normalized()
 
-	velocity += MOVE_SPEED * delta * (transform.basis * motion)
-	velocity *= 0.85
-	position += velocity
+		velocity += MOVE_SPEED * delta * (transform.basis * motion)
+		velocity *= 0.85
+		position += velocity

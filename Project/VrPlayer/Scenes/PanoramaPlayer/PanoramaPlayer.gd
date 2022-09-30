@@ -9,13 +9,15 @@ func _ready():
 	_controlPanel.on_progress_drag_begin.connect(_on_progress_drag_begin)
 	_controlPanel.on_progress_drag_end.connect(_on_progress_drag_end)
 	_controlPanel.on_pixel_format_change.connect(_on_pixel_format_changed)
-	_controlPanel.set_file("res://Data/windows.mp4")
-	_controlPanel.set_material_mode(PlayingControlPanel.MaterialMode.k3d)
+	_controlPanel.set_file("res://Data/shjx.mp4")
+	_controlPanel.set_material_mode(PlayingControlPanel.MaterialMode.kPanorama)
+	var mesh = $MeshInstance3d as MeshInstance3D
 	pass # Replace with function body.
 
 
 func _on_pixel_format_changed(material: Material, texture: Texture):
-	var meshInstance : MeshInstance3D = $MeshInstance3d
+	# var meshInstance : MeshInstance3D = $MeshInstance3d
+	var meshInstance : MeshInstance3D = $Sphere
 	meshInstance.mesh.surface_set_material(0, material)
 
 	pass

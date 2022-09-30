@@ -97,6 +97,13 @@ else()
     )
 endif()
 
+# set env var: ANDROID_SDK_ROOT=D:/Android/AndroidSdk ndk_platform=android-29
+add_custom_target(MyGodot-Android
+    scons platform=android target=release android_arch=arm64v8
+        custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" -j 14
+    WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+)
+
 add_subdirectory(godot/platform/android/java/nativeSrcsConfigs)
 
 file(GLOB CUSTOM_MODULE_LIST

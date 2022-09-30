@@ -2,13 +2,22 @@ extends Node
 
 class_name PlayingControlPanel
 
+enum MaterialMode {
+	k2d,
+	k3d,
+	kPanorama,
+};
+
 @export var materialNv12 : ShaderMaterial
 @export var materialYuv420P : ShaderMaterial
 
 @export var materialNv12_3D : ShaderMaterial
 @export var materialYuv420P_3D : ShaderMaterial
 
-var _is3dMaterial: bool = false
+@export var materialNv12_Panorama : ShaderMaterial
+@export var materialYuv420P_Panorama : ShaderMaterial
+
+var _materialMode: MaterialMode = MaterialMode.k2d
 
 signal on_play()
 signal on_progress_drag_begin()
@@ -29,8 +38,8 @@ func _ready():
 	_progressBar.drag_started.connect(_on_progress_bar_drag_begin)
 	_progressBar.drag_ended.connect(_on_progress_bar_drag_end)
 
-func set_3d_material(b: bool):
-	_is3dMaterial = b
+func set_material_mode(mode: MaterialMode):
+	_materialMode = mode
 	
 func set_file(path: String):
 	_filePath = path
@@ -56,20 +65,26 @@ func _process(delta):
 func _on_pixel_format_changed(fmt: int):
 	var material: Material = null
 	if fmt == FfmpegMediaStream.kPixelFormatNv12:
-		if _is3dMaterial:
+		if _materialMode == MaterialMode.k3d:
 			material = materialNv12_3D.duplicate()
-		else:
+		elif _materialMode == MaterialMode.k2d:
 			material = materialNv12.duplicate()
+		else:
+			material = materialNv12_Panorama.duplicate()
 		material.set_shader_parameter("yTexture", _mediaStream.get_texture(0))
 		material.set_shader_parameter("uvTexture", _mediaStream.get_texture(1))
+		print("Nv12")
 	elif fmt == FfmpegMediaStream.kPixelFormatYuv420P:
-		if _is3dMaterial:
+		if _materialMode == MaterialMode.k3d:
 			material = materialYuv420P_3D.duplicate()
-		else:
+		elif _materialMode == MaterialMode.k2d:
 			material = materialYuv420P.duplicate()
+		else:
+			material = materialYuv420P_Panorama.duplicate()
 		material.set_shader_parameter("yTexture", _mediaStream.get_texture(0))
 		material.set_shader_parameter("uTexture", _mediaStream.get_texture(1))
 		material.set_shader_parameter("vTexture", _mediaStream.get_texture(2))
+		print("Yuv420P")
 	else:
 		print("Unsupported pixel format")	
 	emit_signal("on_pixel_format_change", material, _mediaStream.get_texture(0))

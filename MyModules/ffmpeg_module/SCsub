@@ -7,21 +7,27 @@ my_env = env_modules.Clone()
 
 module_obj = []
 
-include_paths = [
-    "#../Thirdparty/ffmpeg/Win64/include",
-    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/include",
-    "/usr/local/include",
-]
+include_paths = []
 libs = [
     "avcodec",
     "avformat",
-    "avutil"
+    "avutil",
+    "swscale",
+    "swresample",
 ]
-libpath = [
-    "#../Thirdparty/ffmpeg/Win64/lib",
-    "D:/gitrepo/MyGodot/Thirdparty/ffmpeg/Win64/lib",
-    "/usr/local/lib"
-]
+
+libpath = []
+
+if env["platform"] == "android":
+    include_paths.append("#../Thirdparty/ffmpeg/Android-armv8a/include")
+    libpath.append("#../Thirdparty/ffmpeg/Android-armv8a/lib")
+elif env["platform"] == "macos":
+    include_paths.append("/usr/local/include")
+    libpath.append("/usr/local/lib")
+elif env["platform"] == "windows":
+    include_paths.append("#../Thirdparty/ffmpeg/Win64/include")
+    libpath.append("#../Thirdparty/ffmpeg/Win64/lib")
+
 
 my_env.add_source_files(module_obj, "*.cpp")
 env.modules_sources += module_obj

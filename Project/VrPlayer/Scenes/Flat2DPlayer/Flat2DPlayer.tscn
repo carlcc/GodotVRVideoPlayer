@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://xnsyqijt0hta"]
 
 [ext_resource type="Script" path="res://Scenes/Flat2DPlayer/Flat2DPlayer.gd" id="1_ke6yw"]
-[ext_resource type="Texture2D" uid="uid://cwkw46wj0o42k" path="res://icon.svg" id="2_32wqb"]
+[ext_resource type="Texture2D" uid="uid://bkyuogaxgtcjl" path="res://icon.svg" id="2_32wqb"]
 [ext_resource type="PackedScene" uid="uid://dqtf8b5arjboe" path="res://Gui/PlayingControlPanel/PlayingControlPanel.tscn" id="3_siji0"]
 
 [node name="Flat2DPlayer" type="Control"]
