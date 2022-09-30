@@ -1,0 +1,59 @@
+[gd_scene load_steps=10 format=3 uid="uid://dqtf8b5arjboe"]
+
+[ext_resource type="Script" path="res://Gui/PlayingControlPanel/PlayingControlPanel.gd" id="1_b1fen"]
+[ext_resource type="Shader" path="res://Shaders/Nv12_2D.gdshader" id="2_ddkon"]
+[ext_resource type="Shader" path="res://Shaders/Yuv420P_2D.gdshader" id="3_bs1sb"]
+[ext_resource type="Shader" path="res://Shaders/Nv12_3D.gdshader" id="4_uigrg"]
+[ext_resource type="Shader" path="res://Shaders/Yuv420P_3D.gdshader" id="5_2d0hl"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_frnl1"]
+shader = ExtResource("2_ddkon")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ymhpt"]
+shader = ExtResource("3_bs1sb")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qdrnt"]
+render_priority = 0
+shader = ExtResource("4_uigrg")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ktf53"]
+render_priority = 0
+shader = ExtResource("5_2d0hl")
+
+[node name="PlayingControlPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_b1fen")
+materialNv12 = SubResource("ShaderMaterial_frnl1")
+materialYuv420P = SubResource("ShaderMaterial_ymhpt")
+materialNv12_3D = SubResource("ShaderMaterial_qdrnt")
+materialYuv420P_3D = SubResource("ShaderMaterial_ktf53")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -31.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="PlayButton" type="Button" parent="HBoxContainer"]
+offset_right = 41.0
+offset_bottom = 31.0
+text = "Play"
+
+[node name="PlayProgressBar" type="HSlider" parent="HBoxContainer"]
+anchors_preset = -1
+offset_left = 45.0
+offset_right = 1152.0
+offset_bottom = 31.0
+grow_horizontal = 2
+grow_vertical = 0
+size_flags_horizontal = 3
+size_flags_vertical = 1
+scrollable = false

@@ -8,10 +8,20 @@
 
 config_version=5
 
+_global_script_classes=[{
+"base": "Node",
+"class": &"PlayingControlPanel",
+"language": &"GDScript",
+"path": "res://Gui/PlayingControlPanel/PlayingControlPanel.gd"
+}]
+_global_script_class_icons={
+"PlayingControlPanel": ""
+}
+
 [application]
 
 config/name="VrPlayer"
-run/main_scene="res://Gui/VideoPlayer/VideoPlayer.tscn"
+run/main_scene="res://Scenes/Flat2DPlayer/Flat2DPlayer.tscn"
 config/features=PackedStringArray("4.0", "Mobile")
 config/icon="res://icon.svg"
 

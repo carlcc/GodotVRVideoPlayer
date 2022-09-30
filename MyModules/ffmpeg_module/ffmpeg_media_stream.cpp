@@ -451,7 +451,7 @@ static FfmpegMediaStream::FrameInfo AVFrame2Image(AVFrame* frame, AVFrame* tmpFr
         if (frame->format == AV_PIX_FMT_YUV420P) {
             frameInfo.format = FfmpegMediaStream::kPixelFormatYuv420P;
             FillYuv420P(frameInfo, frame);
-        } else if (frame->format == AV_PIX_FMT_DXVA2_VLD) {
+        } else if (frame->format == AV_PIX_FMT_DXVA2_VLD || frame->format == AV_PIX_FMT_VIDEOTOOLBOX) {
             auto ret = av_hwframe_transfer_data(tmpFrame, frame, 0);
             if (ret < 0) {
                 ERR_PRINT("Failed to transfer hw frame");
@@ -461,6 +461,7 @@ static FfmpegMediaStream::FrameInfo AVFrame2Image(AVFrame* frame, AVFrame* tmpFr
             frameInfo.format = FfmpegMediaStream::kPixelFormatNv12;
             FillNv12(frameInfo, tmpFrame);
         } else {
+            ERR_PRINT("Unsupported frame format");
             abort(); // TODO:
         }
     }

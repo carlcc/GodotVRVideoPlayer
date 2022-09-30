@@ -10,7 +10,8 @@ var isMouseDown : bool = false
 
 
 func _ready():
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	# Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	pass
 
 
 func _input(event):
