@@ -17,6 +17,11 @@ static double get_stream_duration(AVStream* stream)
     return get_stream_time_seconds(stream, stream->duration);
 }
 
+static double get_context_duration(AVFormatContext* ctx)
+{
+    return ctx->duration / AV_TIME_BASE;
+}
+
 inline uint32_t get_textures_count_by_pixel_format(FfmpegMediaStream::PixelFormat fmt)
 {
     // clang-format off
@@ -330,7 +335,7 @@ void FfmpegMediaStream::update(double delta)
 
 double FfmpegMediaStream::get_length() const
 {
-    return get_stream_duration(avFormatContext_->streams[videoStreamIndex_]); // TODO:
+    return get_context_duration(avFormatContext_.get());
 }
 
 double FfmpegMediaStream::get_position() const
@@ -590,7 +595,13 @@ void FfmpegMediaStream::decode_thread_routine()
             (void)seekSucceed;
         }
 
-        auto ret = av_read_frame(formatContext, avPacket);
+        int ret = 0;
+        do {
+            if (state_ == State::kStopped) {
+                return;
+            }
+            ret = av_read_frame(formatContext, avPacket);
+        } while (ret == AVERROR(EAGAIN));
         std::unique_ptr<AVPacket, AvPacketDeleter> unrefOnExitScope(avPacket); // we need to unref the packet
 
         if (ret == AVERROR_EOF) {
@@ -604,34 +615,41 @@ void FfmpegMediaStream::decode_thread_routine()
         }
 
         if (avPacket->stream_index == videoStreamIndex_) {
-            ret = avcodec_send_packet(videoCodecContext, avPacket);
+            do {
+                if (state_ == State::kStopped) {
+                    return;
+                }
+                ret = avcodec_send_packet(videoCodecContext, avPacket);
+            } while (ret == AVERROR(EAGAIN));
             if (ret < 0) {
                 CHECK_AV_ERROR(ret);
                 continue;
             }
 
-            ret = avcodec_receive_frame(videoCodecContext, avFrame);
-            if (ret == AVERROR(EAGAIN)) {
-                continue;
-            } else if (ret < 0) {
-                CHECK_AV_ERROR(ret);
-                abort();
-                return;
-            }
-            auto frameInfo = AVFrame2Image(avFrame, tmpFrame);
-            if (frameInfo.format == PixelFormat::kPixelFormatNone) {
-                // Convert failed
-                ERR_PRINT("Failed to convert frame, discard");
-                continue;
-            }
-            frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
-            {
-                std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped || seekTo_ >= 0.0; });
-                if (seekTo_ < 0.0) {
-                    decodedImages_.push_back(std::move(frameInfo));
+            do {
+                ret = avcodec_receive_frame(videoCodecContext, avFrame);
+                if (ret == AVERROR(EAGAIN)) {
+                    break;
+                } else if (ret < 0) {
+                    CHECK_AV_ERROR(ret);
+                    abort();
+                    return;
                 }
-            }
+                auto frameInfo = AVFrame2Image(avFrame, tmpFrame);
+                if (frameInfo.format == PixelFormat::kPixelFormatNone) {
+                    // Convert failed
+                    ERR_PRINT("Failed to convert frame, discard");
+                    continue;
+                }
+                frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
+                {
+                    std::unique_lock<std::mutex> lck(decodedImagesMutex_);
+                    hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped || seekTo_ >= 0.0; });
+                    if (seekTo_ < 0.0) {
+                        decodedImages_.push_back(std::move(frameInfo));
+                    }
+                }
+            } while (true);
         } else if (avPacket->stream_index == audioStreamIndex_) {
             ret = avcodec_send_packet(audioCodecContext, avPacket);
             if (ret < 0) {

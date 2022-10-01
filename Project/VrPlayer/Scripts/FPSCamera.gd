@@ -14,6 +14,12 @@ var isMouseDown : bool = false
 func _ready():
 	rot = transform.basis.get_euler()
 	# Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	# TODO: optinal use mobile sensor
+	var acc = Input.get_accelerometer()
+	var grav = Input.get_gravity()
+	var mag = Input.get_magnetometer()
+	var gyro = Input.get_gyroscope()
+	
 	pass
 
 
@@ -21,6 +27,13 @@ func _input(event):
 	# Mouse look (only if the mouse is captured).
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		# Horizontal mouse look.
+		rot.y -= event.relative.x * MOUSE_SENSITIVITY
+		# Vertical mouse look.
+		rot.x = clamp(rot.x - event.relative.y * MOUSE_SENSITIVITY, -1.57, 1.57)
+		transform.basis = Basis.from_euler(rot)
+		
+	if event is InputEventScreenDrag:
+		var de = event as InputEventScreenDrag
 		rot.y -= event.relative.x * MOUSE_SENSITIVITY
 		# Vertical mouse look.
 		rot.x = clamp(rot.x - event.relative.y * MOUSE_SENSITIVITY, -1.57, 1.57)

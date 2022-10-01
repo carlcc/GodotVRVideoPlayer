@@ -9,12 +9,18 @@
 config_version=5
 
 _global_script_classes=[{
+"base": "Object",
+"class": &"FileUtils",
+"language": &"GDScript",
+"path": "res://Scripts/FileUtils.gd"
+}, {
 "base": "Node",
 "class": &"PlayingControlPanel",
 "language": &"GDScript",
 "path": "res://Gui/PlayingControlPanel/PlayingControlPanel.gd"
 }]
 _global_script_class_icons={
+"FileUtils": "",
 "PlayingControlPanel": ""
 }
 

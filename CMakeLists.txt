@@ -86,6 +86,10 @@ if (WIN32)
         scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j 14
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
+    add_custom_target(MyGodot-Template
+        scons p="${MYGODOT_PLATFORM}" tools=no custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j 14
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+    )
     add_custom_target(CompileDB
         scons p="${MYGODOT_PLATFORM}" tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} compiledb=yes
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
@@ -93,6 +97,10 @@ if (WIN32)
 else()
     add_custom_target(MyGodot
         scons p="${MYGODOT_PLATFORM}" bits=64 tools=yes custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j9
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
+    )
+    add_custom_target(MyGodot-Template
+        scons p="${MYGODOT_PLATFORM}" tools=no custom_modules="${CMAKE_CURRENT_LIST_DIR}/MyModules" target=${BUILD_TYPE} -j 14
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/godot"
     )
 endif()

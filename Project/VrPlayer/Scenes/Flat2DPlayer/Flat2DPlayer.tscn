@@ -14,6 +14,7 @@ grow_vertical = 2
 script = ExtResource("1_ke6yw")
 
 [node name="VideoTextureRect" type="TextureRect" parent="."]
+layout_mode = 1
 anchors_preset = -1
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -24,3 +25,4 @@ ignore_texture_size = true
 stretch_mode = 5
 
 [node name="PlayingControlPanel" parent="." instance=ExtResource("3_siji0")]
+layout_mode = 1

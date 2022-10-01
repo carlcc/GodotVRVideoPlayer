@@ -9,7 +9,6 @@ func _ready():
 	_controlPanel.on_progress_drag_begin.connect(_on_progress_drag_begin)
 	_controlPanel.on_progress_drag_end.connect(_on_progress_drag_end)
 	_controlPanel.on_pixel_format_change.connect(_on_pixel_format_changed)
-	_controlPanel.set_file("res://Data/windows.mp4")
 	_controlPanel.set_material_mode(PlayingControlPanel.MaterialMode.k3d)
 	pass # Replace with function body.
 
