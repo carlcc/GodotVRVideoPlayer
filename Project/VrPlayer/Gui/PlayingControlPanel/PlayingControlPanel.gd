@@ -63,7 +63,7 @@ func _ready():
 	)
 
 	var progressDragArea : ProgressDragArea = find_child("ProgressDragArea")
-	progressDragArea.on_seek_offset.connect(_seek_offset)
+	# progressDragArea.on_seek_offset.connect(_seek_offset)
 	
 	# TODO: Configurable scan directory
 	var videoFileList : OptionButton = find_child("VideoFileList")
@@ -135,12 +135,21 @@ static func _to_hhmmss(t: float) -> String:
 	var s: int = int(t)
 	return "%02d"%h + ":%02d:"%m + "%02d"%s
 
+const _kAutoHideDelay : float = 4
+var _autoHideTimer : float = _kAutoHideDelay
+
 func _process(delta):
 	if _mediaStream != null:
 		_mediaStream.update(delta * _currentPlaySpeedScale)
 		if not _isProgressBarDragging:
 			_progressBar.value = _mediaStream.get_position()
 		_timeLabel.text = "{0}/{1}".format([_to_hhmmss(_mediaStream.get_position()), _to_hhmmss(_mediaStream.get_length())])
+
+		# Auto hide the control ui
+		if _autoHideTimer > 0:
+			_autoHideTimer -= delta
+			if _autoHideTimer <= 0:
+				self.visible = false
 			
 func _on_pixel_format_changed(fmt: int):
 	var material: Material = null
@@ -210,3 +219,14 @@ func _on_stream_play_state_change(state: int):
 	else:
 		emit_signal("on_stopped")
 		_playButton.text = "play"
+
+func _input(event):
+	if event is InputEventMouseMotion or event is InputEventScreenDrag:
+		self.visible = true
+		self._autoHideTimer = _kAutoHideDelay
+	if event is InputEventMouseButton and (event as InputEventMouseButton).is_pressed():
+		self.visible = true
+		self._autoHideTimer = _kAutoHideDelay
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).is_pressed():
+		self.visible = true
+		self._autoHideTimer = _kAutoHideDelay
