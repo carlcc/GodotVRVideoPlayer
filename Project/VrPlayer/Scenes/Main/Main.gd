@@ -1,6 +1,7 @@
 extends Node
 
 static func _find_scenes(dirs) -> Array[String]:
+	FileAccess
 	var arr : Array[String] = []
 	for dir in dirs:
 		var fileName : String = "res://Scenes/" + dir + "/" + dir + ".tscn"
@@ -21,11 +22,12 @@ func _ready():
 	dirs.sort()
 	
 	for dir in dirs:
+		# ".remap" suffix will be appened in apk files
 		var sceneFile : String = "res://Scenes/" + dir + "/" + dir + ".tscn"
-		if not FileAccess.file_exists(sceneFile):
+		if not FileAccess.file_exists(sceneFile) and not FileAccess.file_exists(sceneFile + ".remap"):
 			sceneFile = "res://Scenes/" + dir + "/Main.tscn"
-			if not FileAccess.file_exists(sceneFile):
-				continue
+		if not FileAccess.file_exists(sceneFile) and not FileAccess.file_exists(sceneFile + ".remap"):
+			continue
 
 		var btn : Button = Button.new()
 		btn.text = dir + " scene"

@@ -66,7 +66,11 @@ struct AvIoContextWrapper {
                  [](void* opaque, int64_t offset, int whence) -> int64_t {
                 return reinterpret_cast<AvIoContextWrapper*>(opaque)->seek_func(offset, whence);
             });
-        file = FileAccess::open(filePath, FileAccess::READ);
+        Error error;
+        file = FileAccess::open(filePath, FileAccess::READ, &error);
+        if (error != 0) {
+            ERR_PRINT(String("Failed to open file {0}: code {1}").format(varray(filePath, int(error))));
+        }
     }
     ~AvIoContextWrapper()
     {
