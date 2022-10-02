@@ -37,6 +37,7 @@ inline uint32_t get_textures_count_by_pixel_format(FfmpegMediaStream::PixelForma
 }
 
 static const String kPixelFormatChangedSignalName { "pixel_format_changed" };
+static const String kPlayStateChangedSignalName { "play_state_changed" };
 
 void FfmpegMediaStream::_bind_methods()
 {
@@ -46,6 +47,10 @@ void FfmpegMediaStream::_bind_methods()
     ClassDB::bind_method(D_METHOD("play"), &FfmpegMediaStream::play);
     ClassDB::bind_method(D_METHOD("stop"), &FfmpegMediaStream::stop);
     ClassDB::bind_method(D_METHOD("pause"), &FfmpegMediaStream::pause);
+    ClassDB::bind_method(D_METHOD("is_playing"), &FfmpegMediaStream::is_playing);
+    ClassDB::bind_method(D_METHOD("is_paused"), &FfmpegMediaStream::is_paused);
+    ClassDB::bind_method(D_METHOD("is_stopped"), &FfmpegMediaStream::is_stopped);
+    ClassDB::bind_method(D_METHOD("get_state"), &FfmpegMediaStream::get_state);
     ClassDB::bind_method(D_METHOD("get_length"), &FfmpegMediaStream::get_length);
     ClassDB::bind_method(D_METHOD("get_position"), &FfmpegMediaStream::get_position);
     ClassDB::bind_method(D_METHOD("seek", "position"), &FfmpegMediaStream::seek);
@@ -54,9 +59,14 @@ void FfmpegMediaStream::_bind_methods()
     ClassDB::bind_method(D_METHOD("create_decoders", "hw"), &FfmpegMediaStream::create_decoders);
 
     ADD_SIGNAL(MethodInfo(kPixelFormatChangedSignalName, PropertyInfo(Variant::INT, "format")));
+    ADD_SIGNAL(MethodInfo(kPlayStateChangedSignalName, PropertyInfo(Variant::INT, "state")));
     BIND_ENUM_CONSTANT(kPixelFormatNone);
     BIND_ENUM_CONSTANT(kPixelFormatYuv420P);
     BIND_ENUM_CONSTANT(kPixelFormatNv12);
+
+    BIND_ENUM_CONSTANT(kStateStopped);
+    BIND_ENUM_CONSTANT(kStatePlaying);
+    BIND_ENUM_CONSTANT(kStatePaused);
 }
 
 bool FfmpegMediaStream::set_file(const String& filePath)
@@ -233,12 +243,12 @@ void FfmpegMediaStream::static_mix(void* data)
 
 void FfmpegMediaStream::play()
 {
-    if (state_ == State::kPlaying) {
+    if (state_ == State::kStatePlaying) {
         return;
     }
     State prevState = state_;
-    state_          = State::kPlaying; // set state now, it will be used in decoding thread
-    if (prevState == State::kStopped) {
+    state_          = State::kStatePlaying; // set state now, it will be used in decoding thread
+    if (prevState == State::kStateStopped) {
         assert(!decodingThread_.joinable());
         decodingThread_ = std::thread([this]() {
             decode_thread_routine();
@@ -248,40 +258,48 @@ void FfmpegMediaStream::play()
             AudioServer::get_singleton()->add_mix_callback(&FfmpegMediaStream::static_mix, this);
         }
     }
+
+    emit_signal(kPlayStateChangedSignalName, State::kStatePlaying);
 }
 
 void FfmpegMediaStream::stop()
 {
-    if (state_ == State::kStopped) {
+    if (state_ == State::kStateStopped) {
         return;
     }
     AudioServer::get_singleton()->remove_mix_callback(&FfmpegMediaStream::static_mix, this);
 
     {
         std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-        state_ = State::kStopped;
+        state_ = State::kStateStopped;
     }
     hasDecodedImageCv_.notify_one();
     if (decodingThread_.joinable()) {
         decodingThread_.join();
     }
+    time_          = 0;
+    lastFrameTime_ = 0;
+    totalTime_     = 0;
+    emit_signal(kPlayStateChangedSignalName, State::kStateStopped);
 }
 
 void FfmpegMediaStream::pause()
 {
-    if (state_ != State::kPlaying) {
+    if (state_ != State::kStatePlaying) {
         ERR_PRINT("The stream is not being played");
         return;
     }
 
-    state_ = State::kPaused;
+    state_ = State::kStatePaused;
+    emit_signal(kPlayStateChangedSignalName, State::kStatePaused);
 }
 
 void FfmpegMediaStream::update(double delta)
 {
-    if (state_ != State::kPlaying) {
+    if (state_ != State::kStatePlaying) {
         return;
     }
+
     time_ += delta;
 
     FrameInfo frameInfo {};
@@ -295,9 +313,18 @@ void FfmpegMediaStream::update(double delta)
 
                 lck.unlock();
                 hasDecodedImageCv_.notify_one();
+
+                // if the decoding thread cannot catch up time, then we slow down the clock
+                auto tmp = frameTime + 500.0;
+                if (time_ > tmp) {
+                    time_     = tmp;
+                    frameTime = tmp;
+                }
+                lastFrameTime_ = frameTime;
             }
         }
     }
+
     if (frameInfo.format != PixelFormat::kPixelFormatNone) {
         auto textureCount = get_textures_count_by_pixel_format(frameInfo.format);
 
@@ -335,12 +362,15 @@ void FfmpegMediaStream::update(double delta)
 
 double FfmpegMediaStream::get_length() const
 {
-    return get_context_duration(avFormatContext_.get());
+    if (totalTime_ == 0) {
+        totalTime_ = get_context_duration(avFormatContext_.get());
+    }
+    return totalTime_;
 }
 
 double FfmpegMediaStream::get_position() const
 {
-    return time_;
+    return lastFrameTime_;
 }
 
 double FfmpegMediaStream::seek(double position)
@@ -556,12 +586,7 @@ void FfmpegMediaStream::decode_thread_routine()
     tmpFrame->format        = AV_PIX_FMT_NV12;
     std::unique_ptr<AVFrame, AvFrameDeleter> tmpFrame_(tmpFrame);
 
-    auto& videoTimeBase = formatContext->streams[videoStreamIndex_]->time_base;
-
-    int currentWidth  = -1;
-    int currentHeight = -1;
-
-    while (state_ != State::kStopped) {
+    while (state_ != State::kStateStopped) {
         // handle seek
         double seekTo = -1.0;
         {
@@ -597,7 +622,7 @@ void FfmpegMediaStream::decode_thread_routine()
 
         int ret = 0;
         do {
-            if (state_ == State::kStopped) {
+            if (state_ == State::kStateStopped) {
                 return;
             }
             ret = av_read_frame(formatContext, avPacket);
@@ -609,14 +634,14 @@ void FfmpegMediaStream::decode_thread_routine()
             WARN_PRINT("Video stream ended!");
             {
                 std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                decodedImages_.push_back(FrameInfo { PixelFormat::kPixelFormatNone, -1, nullptr });
+                decodedImages_.push_back(FrameInfo { PixelFormat::kPixelFormatNone, -1, { nullptr } });
             }
             return;
         }
 
         if (avPacket->stream_index == videoStreamIndex_) {
             do {
-                if (state_ == State::kStopped) {
+                if (state_ == State::kStateStopped) {
                     return;
                 }
                 ret = avcodec_send_packet(videoCodecContext, avPacket);
@@ -644,7 +669,7 @@ void FfmpegMediaStream::decode_thread_routine()
                 frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
                 {
                     std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                    hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStopped || seekTo_ >= 0.0; });
+                    hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStateStopped || seekTo_ >= 0.0; });
                     if (seekTo_ < 0.0) {
                         decodedImages_.push_back(std::move(frameInfo));
                     }

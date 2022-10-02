@@ -14,12 +14,6 @@
 class FfmpegMediaStream : public RefCounted {
     GDCLASS(FfmpegMediaStream, RefCounted);
 
-    enum class State : uint8_t {
-        kStopped,
-        kPlaying,
-        kPaused,
-    };
-
     static void static_mix(void* data);
 
 public:
@@ -27,6 +21,11 @@ public:
         kPixelFormatNone = -1,
         kPixelFormatYuv420P,
         kPixelFormatNv12,
+    };
+    enum State : int {
+        kStateStopped,
+        kStatePlaying,
+        kStatePaused,
     };
 
     struct FrameInfo {
@@ -58,6 +57,8 @@ public:
 
     void pause();
 
+    State get_state() const { return state_; }
+
     void update(double delta);
 
     double get_length() const;
@@ -66,9 +67,9 @@ public:
 
     double seek(double position);
 
-    bool is_stopped() const { return state_ == State::kStopped; }
-    bool is_playing() const { return state_ == State::kPlaying; }
-    bool is_paused() const { return state_ == State::kPaused; }
+    bool is_stopped() const { return state_ == State::kStateStopped; }
+    bool is_playing() const { return state_ == State::kStatePlaying; }
+    bool is_paused() const { return state_ == State::kStatePaused; }
 
     Ref<ImageTexture> get_texture(uint32_t index) const { return textures_[index]; }
     uint32_t get_textures_count() const { return textures_.size(); }
@@ -110,8 +111,10 @@ private:
     int waitResampler_ { 0 };
 
     // state
-    std::atomic<State> state_ { State::kStopped };
+    std::atomic<State> state_ { State::kStateStopped };
     double time_ { 0 };
+    double lastFrameTime_ { 0 };
+    mutable double totalTime_ { 0 };
 
     //
     static const constexpr size_t kMaxDecodedFrames_ = 2;
@@ -131,3 +134,4 @@ private:
 };
 
 VARIANT_ENUM_CAST(FfmpegMediaStream::PixelFormat);
+VARIANT_ENUM_CAST(FfmpegMediaStream::State);

@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://dqtf8b5arjboe"]
+[gd_scene load_steps=10 format=3 uid="uid://dqtf8b5arjboe"]
 
 [ext_resource type="Script" path="res://Gui/PlayingControlPanel/PlayingControlPanel.gd" id="1_b1fen"]
 [ext_resource type="Shader" path="res://Shaders/Nv12_2D.gdshader" id="2_ddkon"]
@@ -6,6 +6,7 @@
 [ext_resource type="Material" uid="uid://cdydrp8nrmvq0" path="res://Materials/Nv12_3D.material" id="4_ai5iv"]
 [ext_resource type="Material" uid="uid://dyuuk6js3gdm4" path="res://Materials/Nv12_Panorama.material" id="6_u8nuf"]
 [ext_resource type="Material" uid="uid://ca0geguemw1pv" path="res://Materials/Yuv420P_Panorama.material" id="7_n1f4t"]
+[ext_resource type="Script" path="res://Gui/PlayingControlPanel/ProgressDraggingArea.gd" id="7_nffb3"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_frnl1"]
 shader = ExtResource("2_ddkon")
@@ -28,24 +29,56 @@ materialYuv420P_3D = ExtResource("7_n1f4t")
 materialNv12_Panorama = ExtResource("6_u8nuf")
 materialYuv420P_Panorama = ExtResource("7_n1f4t")
 
-[node name="HBoxContainer" type="HBoxContainer" parent="."]
-anchors_preset = 12
-anchor_top = 1.0
+[node name="Controllers" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.6
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -31.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 2
+
+[node name="ProgressDragArea" type="Control" parent="Controllers"]
+layout_mode = 2
+anchors_preset = 0
+offset_right = 1152.0
+offset_bottom = 224.0
+grow_horizontal = 2
+grow_vertical = 0
+size_flags_vertical = 3
+script = ExtResource("7_nffb3")
+
+[node name="MouseOffsetPreviewLabel" type="Label" parent="Controllers/ProgressDragArea"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+theme_override_font_sizes/font_size = 0
+
+[node name="FingerOffsetPreviewLabel" type="Label" parent="Controllers/ProgressDragArea"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Controllers"]
+layout_mode = 2
+offset_top = 228.0
+offset_right = 1152.0
+offset_bottom = 259.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="PlayButton" type="Button" parent="HBoxContainer"]
+[node name="PlayButton" type="Button" parent="Controllers/HBoxContainer"]
+layout_mode = 2
 offset_right = 41.0
 offset_bottom = 31.0
 text = "Play"
 
-[node name="PlayProgressBar" type="HSlider" parent="HBoxContainer"]
+[node name="PlayProgressBar" type="HSlider" parent="Controllers/HBoxContainer"]
+layout_mode = 2
 anchors_preset = -1
 offset_left = 45.0
-offset_right = 1125.0
+offset_right = 1078.0
 offset_bottom = 31.0
 grow_horizontal = 2
 grow_vertical = 0
@@ -53,7 +86,15 @@ size_flags_horizontal = 3
 size_flags_vertical = 1
 scrollable = false
 
-[node name="TimeLabel" type="Label" parent="HBoxContainer"]
+[node name="PlaySpeedOption" type="OptionButton" parent="Controllers/HBoxContainer"]
+layout_mode = 2
+offset_left = 1082.0
+offset_right = 1125.0
+offset_bottom = 31.0
+fit_to_longest_item = false
+
+[node name="TimeLabel" type="Label" parent="Controllers/HBoxContainer"]
+layout_mode = 2
 offset_left = 1129.0
 offset_top = 2.0
 offset_right = 1152.0
@@ -61,10 +102,12 @@ offset_bottom = 28.0
 text = "0:0"
 
 [node name="InfoLabel" type="Label" parent="."]
+layout_mode = 0
 offset_right = 40.0
 offset_bottom = 23.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -73,12 +116,14 @@ offset_bottom = 55.0
 grow_horizontal = 0
 
 [node name="ExitButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
 offset_right = 160.0
 offset_bottom = 31.0
 grow_horizontal = 0
 text = "Back To Main Menu"
 
 [node name="VideoFileList" type="OptionButton" parent="VBoxContainer"]
+layout_mode = 2
 offset_top = 35.0
 offset_right = 160.0
 offset_bottom = 55.0

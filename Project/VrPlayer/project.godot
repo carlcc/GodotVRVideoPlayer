@@ -18,10 +18,16 @@ _global_script_classes=[{
 "class": &"PlayingControlPanel",
 "language": &"GDScript",
 "path": "res://Gui/PlayingControlPanel/PlayingControlPanel.gd"
+}, {
+"base": "Control",
+"class": &"ProgressDragArea",
+"language": &"GDScript",
+"path": "res://Gui/PlayingControlPanel/ProgressDraggingArea.gd"
 }]
 _global_script_class_icons={
 "FileUtils": "",
-"PlayingControlPanel": ""
+"PlayingControlPanel": "",
+"ProgressDragArea": ""
 }
 
 [application]
