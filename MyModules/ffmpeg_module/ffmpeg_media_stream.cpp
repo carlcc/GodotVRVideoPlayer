@@ -75,40 +75,40 @@ bool FfmpegMediaStream::set_file(const String& filePath)
         ERR_PRINT("You have set the file path before, try to create a new FfmpegMediaStream object!");
         return false;
     }
+    bool useAvio =
 #if defined(__ANDROID__)
-    bool androidUseAvio = filePath.begins_with("res://") || filePath.begins_with("user://");
-    if (androidUseAvio) {
+            filePath.begins_with("res://") || filePath.begins_with("user://");
+#else
+            true;
 #endif
+    if (useAvio) {
         avioContext_ = std::make_unique<AvIoContextWrapper>(filePath);
         auto* avio   = avioContext_.get();
         if (avio->file.is_null()) {
             ERR_PRINT("Cannot open file '" + filePath + "'.");
             return false;
         }
-#if defined(__ANDROID__)
     }
-#endif
     filePath_ = filePath;
 
     int ret = 0;
-#if !defined(__ANDROID__)
-    ret = av_probe_input_buffer(avio->context, &inputFormat_, "", nullptr, 0, 0);
-    if (ret < 0) {
-        ERR_PRINT("Failed to probe input format!");
-        return false;
+    if (useAvio) {
+        ret = av_probe_input_buffer(avioContext_.get()->context, &inputFormat_, "", nullptr, 0, 0);
+        if (ret < 0) {
+            ERR_PRINT("Failed to probe input format!");
+            return false;
+        }
     }
-#endif
 
     // open file
-    AVFormatContext* formatContext = avformat_alloc_context();
-#if !defined(__ANDROID__)
-    formatContext->pb    = avioContext_->context;
-    formatContext->flags = AVFMT_FLAG_CUSTOM_IO;
-    const char* url      = "";
-#else
     auto utf8FilePath = filePath.utf8();
-    const char* url = androidUseAvio ? utf8FilePath.get_data() : "";
-#endif
+    const char* url = utf8FilePath.get_data();
+    AVFormatContext* formatContext = avformat_alloc_context();
+    if (useAvio) {
+        formatContext->pb = avioContext_->context;
+        formatContext->flags = AVFMT_FLAG_CUSTOM_IO;
+        url = "";
+    }
     avFormatContext_.reset(formatContext);
     ret = avformat_open_input(&formatContext, url, inputFormat_, nullptr);
     if (ret != 0) {
