@@ -107,7 +107,7 @@ bool FfmpegMediaStream::set_file(const String& filePath)
     const char* url      = "";
 #else
     auto utf8FilePath = filePath.utf8();
-    const char* url = utf8FilePath.get_data();
+    const char* url = androidUseAvio ? utf8FilePath.get_data() : "";
 #endif
     avFormatContext_.reset(formatContext);
     ret = avformat_open_input(&formatContext, url, inputFormat_, nullptr);
