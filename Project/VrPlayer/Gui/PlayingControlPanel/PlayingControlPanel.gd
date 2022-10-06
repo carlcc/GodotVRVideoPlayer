@@ -35,19 +35,35 @@ var _currentPlayState : int = FfmpegMediaStream.kStateStopped
 var _isProgressBarDragging : bool = false
 var _filePath: String = ""
 
-var _currentHwAccel : String
 var _currentPixelFormat : String
-var _availableHwDecoders: PackedStringArray
-
+var _availableDecoders : Array[FfmpegCodec]
+var _currentEncapsulationFormat : String
+var _currentVideoEncodingFormat : String
 var _currentPlaySpeedScale: float = 1.0
+
+var _currentVideoCodec : FfmpegCodec = null
+var _currentVideoCodecHw : FfmpegCodecHwConfig = null
 
 const _kPlaySpeedScales : Array[float] = [
 	0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0
 ]
 
 func _updateInfoLabel():
-	_infoLabel.text = "Current File: {0}\nAvailable HwAccels: {1}\nCurrent HwAccel: {2}\nCurrent PixFmt: {3}".format(
-		[_filePath, _availableHwDecoders, _currentHwAccel, _currentPixelFormat])
+	var str : String = ""
+	str += "Current File: %s\n" % _filePath
+	str += "Current PixFmt: %s\n" % _currentPixelFormat
+	str += "Current Encapsulation: %s\n" % _currentEncapsulationFormat
+	str += "Current Video Codec Format: %s\n" % _currentVideoEncodingFormat
+	str += "Current Hw Accel: %s\n" % _currentVideoCodecHw.get_name()
+	str += "Available codecs:\n"
+	var availableCodecStrings : Array[String] = []
+	for codec in _availableDecoders:
+		var hwNames : Array[String] = []
+		for hwcfg in codec.available_hw_configs():
+			hwNames.push_back(hwcfg.get_name())
+		str += "  {0}, with hwaccels: [{1}]\n".format([codec.get_name(), ",".join(hwNames)])
+	
+	_infoLabel.text = str
 
 func _on_play_speed_selected(index: int):
 	_currentPlaySpeedScale = _kPlaySpeedScales[index]
@@ -99,21 +115,43 @@ func _exit_tree():
 func set_material_mode(mode: MaterialMode):
 	_materialMode = mode
 	
+static func _choose_video_decoder(decoders : Array[FfmpegCodec]) -> FfmpegCodec:
+	for dec in decoders:
+		var hwCfgs = dec.available_hw_configs()
+		if hwCfgs.size() > 0:
+			return dec;
+		
+	if decoders.is_empty():
+		return null
+	return decoders[0]
+	
+static func _choose_video_hw_config(configs: Array[FfmpegCodecHwConfig]) -> FfmpegCodecHwConfig:
+	if configs.is_empty():
+		return null
+	return configs[0]
+	
 func set_file(path: String):
 	_filePath = path
 	var ms = FfmpegMediaStream.new()
 	if not ms.set_file(_filePath):
 		return
-	var hwAccels = ms.available_video_hardware_accelerators()
-	print("Available video hw decoders: ", hwAccels)
-	var hw = "none"
-	if not hwAccels.is_empty():
-		hw = hwAccels[0]
-	ms.create_decoders(hw)
+	var decoders = ms.available_video_decoders()
+	var decoder = _choose_video_decoder(decoders)
+	if decoder == null:
+		print("No decoder found!")
+		return
+	var hwCfg = _choose_video_hw_config(decoder.available_hw_configs())
+	if hwCfg == null:
+		print("No hw decoder found!")
+	
+	if !ms.create_decoders(decoder, hwCfg):
+		return
 	_progressBar.min_value = 0
 	_progressBar.max_value = ms.get_length()
-	_availableHwDecoders = hwAccels
-	_currentHwAccel = hw
+	_currentEncapsulationFormat = ms.get_encapsulation_format()
+	_currentVideoEncodingFormat = ms.get_video_encoding_format()
+	_availableDecoders = ms.available_video_decoders()
+	_currentVideoCodecHw = hwCfg
 	_updateInfoLabel()
 	
 	if _mediaStream != null:
