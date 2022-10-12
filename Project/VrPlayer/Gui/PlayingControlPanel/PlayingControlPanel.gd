@@ -29,6 +29,7 @@ signal on_pixel_format_change(material: Material, texture: Texture)
 @onready var _progressBar : HSlider = find_child("PlayProgressBar", true)
 @onready var _timeLabel : Label = find_child("TimeLabel", true)
 @onready var _infoLabel : Label = find_child("InfoLabel", true)
+@onready var _dropEvery2FramesCheck : CheckBox = find_child("DropEvery2FramesCheck")
 var _mediaStream : FfmpegMediaStream
 var _currentPlayState : int = FfmpegMediaStream.kStateStopped
 
@@ -79,6 +80,11 @@ func _ready():
 	)
 
 	var progressDragArea : ProgressDragArea = find_child("ProgressDragArea")
+	
+	var perSecondTimer : Timer = find_child("PerSecondTimer")
+	perSecondTimer.timeout.connect(_on_per_second_timer)
+	
+	_dropEvery2FramesCheck.toggled.connect(_on_drop_every2frames_check_toggle)
 	# progressDragArea.on_seek_offset.connect(_seek_offset)
 	
 	# TODO: Configurable scan directory
@@ -86,6 +92,8 @@ func _ready():
 	for f in FileUtils.list_files_in_directory_absolute("res://Data"):
 		videoFileList.add_item(f)
 	for f in FileUtils.list_files_in_directory_absolute("/sdcard/Videos"):
+		videoFileList.add_item(f)
+	for f in FileUtils.list_files_in_directory_absolute("D:/迅雷下载/kavr-239"):
 		videoFileList.add_item(f)
 	for f in FileUtils.list_files_in_directory_absolute(OS.get_system_dir(OS.SYSTEM_DIR_MOVIES)):
 		videoFileList.add_item(f)
@@ -159,9 +167,20 @@ func set_file(path: String):
 		_mediaStream.pixel_format_changed.disconnect(_on_pixel_format_changed);
 	ms.pixel_format_changed.connect(_on_pixel_format_changed)
 	ms.play_state_changed.connect(_on_stream_play_state_change)
+	if _dropEvery2FramesCheck.button_pressed:
+		ms.set_drop_every_n_frame(2)
+	else:
+		ms.set_drop_every_n_frame(0)
 	_mediaStream = ms
 	ms.play()
-	
+
+func _on_drop_every2frames_check_toggle(pressed: bool):
+	if _mediaStream != null:
+		if pressed:
+			_mediaStream.set_drop_every_n_frame(2)
+		else:
+			_mediaStream.set_drop_every_n_frame(0)
+
 func get_progress() -> float :
 	return _progressBar.value
 
@@ -175,10 +194,12 @@ static func _to_hhmmss(t: float) -> String:
 
 const _kAutoHideDelay : float = 4
 var _autoHideTimer : float = _kAutoHideDelay
+var _fpsCounter : int = 0
 
 func _process(delta):
 	if _mediaStream != null:
-		_mediaStream.update(delta * _currentPlaySpeedScale)
+		if _mediaStream.update(delta * _currentPlaySpeedScale):
+			_fpsCounter += 1
 		if not _isProgressBarDragging:
 			_progressBar.value = _mediaStream.get_position()
 		_timeLabel.text = "{0}/{1}".format([_to_hhmmss(_mediaStream.get_position()), _to_hhmmss(_mediaStream.get_length())])
@@ -188,7 +209,13 @@ func _process(delta):
 			_autoHideTimer -= delta
 			if _autoHideTimer <= 0:
 				self.visible = false
-			
+
+@onready var _fpsLabel : Label = find_child("FPSLabel")
+func _on_per_second_timer():
+	_fpsLabel.text = "FPS {0}".format([_fpsCounter])
+	_fpsCounter = 0
+	pass
+	
 func _on_pixel_format_changed(fmt: int):
 	var material: Material = null
 	if fmt == FfmpegMediaStream.kPixelFormatNv12:

@@ -125,6 +125,7 @@ void FfmpegMediaStream::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_audio_encoding_format"), &FfmpegMediaStream::get_audio_encoding_format);
     ClassDB::bind_method(D_METHOD("get_video_codec_name"), &FfmpegMediaStream::get_video_codec_name);
     ClassDB::bind_method(D_METHOD("get_audio_codec_name"), &FfmpegMediaStream::get_audio_codec_name);
+    ClassDB::bind_method(D_METHOD("set_drop_every_n_frame"), &FfmpegMediaStream::set_drop_every_n_frame);
 
     ClassDB::bind_method(D_METHOD("seek", "position"), &FfmpegMediaStream::seek);
     ClassDB::bind_method(D_METHOD("set_file", "filePath"), &FfmpegMediaStream::set_file);
@@ -357,7 +358,7 @@ void FfmpegMediaStream::stop()
         std::unique_lock<std::mutex> lck(decodedImagesMutex_);
         state_ = State::kStateStopped;
     }
-    hasDecodedImageCv_.notify_one();
+    hasDecodedImageCv_.notify_all();
     if (decodingThread_.joinable()) {
         decodingThread_.join();
     }
@@ -378,10 +379,16 @@ void FfmpegMediaStream::pause()
     emit_signal(kPlayStateChangedSignalName, State::kStatePaused);
 }
 
-void FfmpegMediaStream::update(double delta)
+static int64_t now()
+{
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+bool FfmpegMediaStream::update(double delta)
 {
     if (state_ != State::kStatePlaying) {
-        return;
+        return false;
     }
 
     time_ += delta;
@@ -439,9 +446,11 @@ void FfmpegMediaStream::update(double delta)
                 tw[i]->update(frameInfo.images[i]);
             }
         }
+        return true;
     } else if (frameInfo.frameTime < 0) {
         stop();
     }
+    return false;
 }
 
 double FfmpegMediaStream::get_length() const
@@ -481,12 +490,6 @@ double FfmpegMediaStream::seek(double position)
         av_strerror(ret, errBuf, sizeof(errBuf));                  \
         ERR_PRINT(String("av error: {0}").format(varray(errBuf))); \
     } while (false)
-
-static int64_t now()
-{
-    using namespace std::chrono;
-    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
-}
 
 template <int kElementSize>
 inline void copy_video_frame(
@@ -574,14 +577,40 @@ static FfmpegMediaStream::FrameInfo AVFrame2Image(AVFrame* frame, AVFrame* tmpFr
             frameInfo.format = FfmpegMediaStream::kPixelFormatNv12;
             FillNv12(frameInfo, frame);
         } else if (frame->format == AV_PIX_FMT_DXVA2_VLD || frame->format == AV_PIX_FMT_VIDEOTOOLBOX || frame->format == AV_PIX_FMT_D3D11) {
-            auto ret = av_hwframe_transfer_data(tmpFrame, frame, 0);
+            AVFrame myFrame {};
+            auto width      = frame->width;
+            auto height     = frame->height;
+            auto halfWidth  = frame->width / 2;
+            auto halfHeight = frame->height / 2;
+            auto ySize      = width * height;
+            auto uvSize     = halfWidth * halfHeight * 2;
+
+            Vector<uint8_t> yBuffer, uvBuffer;
+            yBuffer.resize(ySize);
+            uvBuffer.resize(uvSize);
+            auto* yw  = yBuffer.ptrw();
+            auto* uvw = uvBuffer.ptrw();
+
+            myFrame.format  = AV_PIX_FMT_NV12;
+            myFrame.data[0] = yw;
+            myFrame.data[1] = uvw;
+            myFrame.buf[0]  = av_buffer_create(
+                 yw, ySize, [](void*, uint8_t*) {}, nullptr, 0);
+            myFrame.buf[1] = av_buffer_create(
+                uvw, uvSize, [](void*, uint8_t*) {}, nullptr, 0);
+            myFrame.linesize[0] = width;
+            myFrame.linesize[1] = halfWidth * 2;
+            auto ret            = av_hwframe_transfer_data(&myFrame, frame, 0);
             if (ret < 0) {
                 ERR_PRINT("Failed to transfer hw frame");
                 return frameInfo;
             }
 
-            frameInfo.format = FfmpegMediaStream::kPixelFormatNv12;
-            FillNv12(frameInfo, tmpFrame);
+            frameInfo.format    = FfmpegMediaStream::kPixelFormatNv12;
+            frameInfo.images[0] = Ref<Image> { memnew(Image(width, height, false, Image::FORMAT_R8, yBuffer)) };
+            frameInfo.images[1] = Ref<Image> { memnew(Image(halfWidth, halfHeight, false, Image::FORMAT_RG8, uvBuffer)) };
+
+            //       FillNv12(frameInfo, tmpFrame);
         } else {
             ERR_PRINT("Unsupported frame format");
             abort(); // TODO:
@@ -747,18 +776,23 @@ void FfmpegMediaStream::decode_thread_routine()
                         abort();
                         return;
                     }
-                    auto frameInfo = AVFrame2Image(avFrame, tmpFrame);
-                    if (frameInfo.format == PixelFormat::kPixelFormatNone) {
-                        // Convert failed
-                        ERR_PRINT("Failed to convert frame, discard");
-                        continue;
-                    }
-                    frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
-                    {
-                        std::unique_lock<std::mutex> lck(decodedImagesMutex_);
-                        hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStateStopped || seekTo_ >= 0.0; });
-                        if (seekTo_ < 0.0) {
-                            decodedImages_.push_back(std::move(frameInfo));
+                    ++currentFrameNumber_;
+                    if (dropEveryNFrame_ > 1 && currentFrameNumber_ % dropEveryNFrame_ == 0) {
+                        // drop
+                    } else {
+                        auto frameInfo = AVFrame2Image(avFrame, tmpFrame);
+                        if (frameInfo.format == PixelFormat::kPixelFormatNone) {
+                            // Convert failed
+                            ERR_PRINT("Failed to convert frame, discard");
+                            continue;
+                        }
+                        frameInfo.frameTime = get_stream_time_seconds(avFormatContext_->streams[videoStreamIndex_], avFrame->pts);
+                        {
+                            std::unique_lock<std::mutex> lck(decodedImagesMutex_);
+                            hasDecodedImageCv_.wait(lck, [this]() { return decodedImages_.size() < kMaxDecodedFrames_ || state_ == State::kStateStopped || seekTo_ >= 0.0; });
+                            if (seekTo_ < 0.0) {
+                                decodedImages_.push_back(std::move(frameInfo));
+                            }
                         }
                     }
                 } while (true);

@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3 uid="uid://cxcsbpmxkgmdb"]
+
+[ext_resource type="Script" path="res://Scenes/VrPlayer/Gui/Setting.gd" id="1_kbk4s"]
+
+[node name="Setting" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_kbk4s")
+
+[node name="GridContainer" type="GridContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+
+[node name="CameraFovName" type="Label" parent="GridContainer"]
+offset_right = 96.0
+offset_bottom = 26.0
+text = "Camera FOV"
+
+[node name="CameraFovValue" type="Label" parent="GridContainer"]
+offset_left = 100.0
+offset_right = 142.0
+offset_bottom = 26.0
+text = "value"
+
+[node name="CameraFovSlider" type="HSlider" parent="GridContainer"]
+offset_left = 146.0
+offset_right = 1152.0
+offset_bottom = 16.0
+size_flags_horizontal = 3
