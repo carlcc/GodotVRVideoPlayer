@@ -98,13 +98,15 @@ public:
 
     State get_state() const { return state_; }
 
-    void update(double delta);
+    bool update(double delta);
 
     double get_length() const;
 
     double get_position() const;
 
     double seek(double position);
+
+    void set_drop_every_n_frame(uint32_t n) { dropEveryNFrame_ = n; }
 
     bool is_stopped() const { return state_ == State::kStateStopped; }
     bool is_playing() const { return state_ == State::kStatePlaying; }
@@ -157,6 +159,9 @@ private:
     int audioBufferingMs_ { 1000 };
     int waitResamplerLimit_ { 2 };
     int waitResampler_ { 0 };
+
+    uint32_t dropEveryNFrame_ { 0 };
+    uint32_t currentFrameNumber_ { 0 };
 
     // state
     std::atomic<State> state_ { State::kStateStopped };

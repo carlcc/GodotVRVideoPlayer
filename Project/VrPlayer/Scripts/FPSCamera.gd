@@ -1,6 +1,7 @@
-extends Camera3D
+extends Node
 
 @export var canMove : bool = true
+@export var camera : Camera3D = null
 
 const MOUSE_SENSITIVITY = 0.002
 const MOVE_SPEED = 1.5
@@ -12,13 +13,11 @@ var isMouseDown : bool = false
 
 
 func _ready():
-	rot = transform.basis.get_euler()
-	# Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	# TODO: optinal use mobile sensor
-	var acc = Input.get_accelerometer()
-	var grav = Input.get_gravity()
-	var mag = Input.get_magnetometer()
-	var gyro = Input.get_gyroscope()
+	var thisNode = self.get_node(".");
+	if camera == null and thisNode is Camera3D:
+		camera = thisNode as Camera3D
+	if camera == null and thisNode.get_parent() is Camera3D:
+		camera = thisNode.get_parent() as Camera3D
 	
 	pass
 
@@ -30,14 +29,14 @@ func _input(event):
 		rot.y -= event.relative.x * MOUSE_SENSITIVITY
 		# Vertical mouse look.
 		rot.x = clamp(rot.x - event.relative.y * MOUSE_SENSITIVITY, -1.57, 1.57)
-		transform.basis = Basis.from_euler(rot)
+		camera.transform.basis = Basis.from_euler(rot)
 		
 	if event is InputEventScreenDrag:
 		var de = event as InputEventScreenDrag
 		rot.y -= event.relative.x * MOUSE_SENSITIVITY
 		# Vertical mouse look.
 		rot.x = clamp(rot.x - event.relative.y * MOUSE_SENSITIVITY, -1.57, 1.57)
-		transform.basis = Basis.from_euler(rot)
+		camera.transform.basis = Basis.from_euler(rot)
 	
 	if event.is_action_pressed("RightMouseDown"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -57,6 +56,6 @@ func _process(delta):
 		# `sqrt(2)` times faster than straight movement.
 		motion = motion.normalized()
 
-		velocity += MOVE_SPEED * delta * (transform.basis * motion)
+		velocity += MOVE_SPEED * delta * (camera.transform.basis * motion)
 		velocity *= 0.85
-		position += velocity
+		camera.position += velocity

@@ -1,0 +1,104 @@
+[gd_scene load_steps=7 format=3 uid="uid://dc87og8mi6gtu"]
+
+[ext_resource type="Script" path="res://Scenes/SensorTest/SensorTest.gd" id="1_hm66f"]
+[ext_resource type="Script" path="res://Scripts/SensorCameraController.gd" id="2_xk1ib"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_toogv"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_dnoia"]
+
+[sub_resource type="Sky" id="Sky_8koa8"]
+sky_material = SubResource("ProceduralSkyMaterial_dnoia")
+
+[sub_resource type="Environment" id="Environment_2okh0"]
+background_mode = 2
+sky = SubResource("Sky_8koa8")
+
+[node name="SensorTest" type="Node3D"]
+script = ExtResource("1_hm66f")
+
+[node name="gravity" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.833381, 0, 0, 0, 0.833381, 0, 0, 0, 0.833381, 1.55487, -1.25802, -0.385297)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="gravity"]
+transform = Transform3D(0.00742148, 0, 0.1635, 0, -0.240335, 0, 2.56161, 0, -0.000473691, 0.162864, 0, -1.47204)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="Label3d" type="Label3D" parent="gravity"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.69415, 0)
+text = "Gravity"
+
+[node name="magneto" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.833381, 0, 0, 0, 0.833381, 0, 0, 0, 0.833381, 2.85455, 1.99728, -2.11332)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="magneto"]
+transform = Transform3D(-0.109548, 0, 0.163351, 0, -0.240335, 0, 2.55928, 0, 0.00699209, 0.0526793, 0, -1.12272)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="Label3d" type="Label3D" parent="magneto"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.69415, 0)
+text = "magneto"
+
+[node name="accelerator" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.833381, 0, 0, 0, 0.833381, 0, 0, 0, 0.833381, -3.15154, 1.25623, -2.15873)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="accelerator"]
+transform = Transform3D(0.108699, 0, 0.163353, 0, -0.240335, 0, 2.55931, 0, -0.00693793, 0.0598896, 0, -1.2487)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="Label3d" type="Label3D" parent="accelerator"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.69415, 0)
+text = "Accelerator"
+
+[node name="gyroscope" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.833381, 0, 0, 0, 0.833381, 0, 0, 0, 0.833381, -2.8092, -1.47373, -0.168304)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="gyroscope"]
+transform = Transform3D(0.0889971, 0, 0.163402, 0, -0.240335, 0, 2.56007, 0, -0.00568042, -0.0158379, 2.86086e-07, -1.38953)
+mesh = SubResource("BoxMesh_toogv")
+
+[node name="Label3d" type="Label3D" parent="gyroscope"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.69415, 0)
+text = "Gyroscope"
+
+[node name="Camera2d" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.19209e-07, -0.0492318, 3.42787)
+script = ExtResource("2_xk1ib")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_2okh0")
+
+[node name="Control" type="VBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="grav" type="Label" parent="Control"]
+offset_right = 1152.0
+offset_bottom = 23.0
+
+[node name="acc" type="Label" parent="Control"]
+offset_top = 27.0
+offset_right = 1152.0
+offset_bottom = 50.0
+
+[node name="mag" type="Label" parent="Control"]
+offset_top = 54.0
+offset_right = 1152.0
+offset_bottom = 77.0
+
+[node name="gyro" type="Label" parent="Control"]
+offset_top = 81.0
+offset_right = 1152.0
+offset_bottom = 104.0
+
+[node name="north" type="Label" parent="Control"]
+offset_top = 108.0
+offset_right = 1152.0
+offset_bottom = 131.0

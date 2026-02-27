@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://bhhrloul6ltxq"]
+[gd_scene load_steps=7 format=3 uid="uid://bhhrloul6ltxq"]
 
 [ext_resource type="Script" path="res://Scenes/VrPlayer/VrPlayer.gd" id="1_2h68r"]
 [ext_resource type="PackedScene" uid="uid://da1qltq2v4rur" path="res://Scenes/PanoramaPlayer/PanoramaPlayer.tscn" id="1_lapqs"]
 [ext_resource type="Script" path="res://Scripts/FPSCamera.gd" id="2_kj8be"]
+[ext_resource type="Texture2D" uid="uid://bkyuogaxgtcjl" path="res://icon.svg" id="2_nyi6n"]
+[ext_resource type="Script" path="res://Scripts/SensorCameraController.gd" id="4_jxey5"]
+[ext_resource type="PackedScene" uid="uid://cxcsbpmxkgmdb" path="res://Scenes/VrPlayer/Gui/Setting.tscn" id="6_dcmg5"]
 
 [node name="VrPlayer" type="Node3D"]
 script = ExtResource("1_2h68r")
@@ -28,6 +31,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("2_nyi6n")
 ignore_texture_size = true
 stretch_mode = 5
 
@@ -44,10 +48,18 @@ anchor_right = 0.7
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("2_nyi6n")
 ignore_texture_size = true
 stretch_mode = 5
 
 [node name="PanoramaPlayer" parent="." instance=ExtResource("1_lapqs")]
+
+[node name="Setting" parent="PanoramaPlayer" node_paths=PackedStringArray("cameraL", "cameraR") instance=ExtResource("6_dcmg5")]
+anchors_preset = -1
+anchor_top = 0.15
+anchor_bottom = 0.9
+cameraL = NodePath("../../LEye/LCamera")
+cameraR = NodePath("../../REye/RCamera")
 
 [node name="LEye" type="SubViewport" parent="."]
 size = Vector2i(1024, 1024)
@@ -58,6 +70,9 @@ transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 
 script = ExtResource("2_kj8be")
 canMove = false
 
+[node name="Gyroscope" type="Node" parent="LEye/LCamera"]
+script = ExtResource("4_jxey5")
+
 [node name="REye" type="SubViewport" parent="."]
 size = Vector2i(1024, 1024)
 render_target_update_mode = 4
@@ -65,3 +80,6 @@ render_target_update_mode = 4
 [node name="RCamera" type="Camera3D" parent="REye"]
 script = ExtResource("2_kj8be")
 canMove = false
+
+[node name="Gyroscope" type="Node" parent="REye/RCamera"]
+script = ExtResource("4_jxey5")
